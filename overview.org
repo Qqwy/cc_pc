@@ -1,0 +1,54 @@
+* Why me?
+** During Christmas, Parser Combinator vs Parser Generator
+* What _is_ a parser?
+** Why do we use them?
+https://en.wikipedia.org/wiki/Chomsky_hierarchy
+*** A 'string' is an ordered list of characters.
+*** But: We are interested in the _meaning_ of groups of these characters in context.
+*** Other data structures are a lot more suitable for this than strings.
+**** (Abstract Syntax) Trees: AST.
+*** Parsing: the process of analysing strings conforming to the rules of a formal grammar.
+**** Turn them into AST
+**** Check for syntax errors, etc.
+*** When do we use them? -> For anything more difficult than reading comma-separated-values.
+* What is a 'Grammar'?
+** LL 'what do I look for'
+*** Left-to-right, Leftmost derivation ('Top Down', 'Recursive Descent').
+** LR 'what do I have'
+*** Left-to-right, Rightmost derivation ('Bottom up', 'Shift-Reduce').
+** Variants:
+*** LL(k), LL(*), LR(1), LR(k), LALR(1), ...
+** The set of grammars in LR is a little bit more than LL.
+** Context-dependent languages outside of LR.
+https://en.wikipedia.org/wiki/Bottom-up_parsing
+** Non-Context-free grammars
+* LL-parsing in more detail
+** What is a 'Parser Combinator'?
+*** Build a Parser Combinator(?)
+https://www.youtube.com/watch?v=wzz0sm1YCWg
+*** Small functions that take a string and return:
+**** On success: a piece of AST, together with the rest of the string.
+**** On failure: A descriptive error.
+* Problems a LL-parser has.
+** Left Recursion
+** Ways to mitigate this problem.
+* So: Lets build a LR-parser!
+* What is a 'Parser Generator'?
+** Main problem it solves: 
+*** left-recursion.
+** Problems it creates:
+*** Separate grammar necessary
+*** Hard to write, hard to debug.
+**** 
+* 40 years of progress
+** Nondeterministic parsers:
+*** GLR
+*** PEG: Packrat parsing.
+*** GLL -> Parser Combinators that deal with left recursion!
+** 
+* Recap
+* When should you use what?
+** Parser Combinators:
+*** Maintainable, understandable.
+** Parser Generators
+*** Powerful, but hard to maintain.
