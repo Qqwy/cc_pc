@@ -16,16 +16,20 @@
 //     };
 // };
 
+class Empty{};
 
 // template<typename F>
 template <typename A>
 struct Parser {
-    std::function<std::pair<A, std::string>(std::string&)> d_fun;
-    Parser(std::function<std::pair<A, std::string>(std::string&)> const & fun)
+    typedef std::pair<A, std::string> SuccessfullParse;
+    typedef std::experimental::optional<SuccessfullParse> MaybeParse;
+
+    std::function<MaybeParse(std::string&)> d_fun;
+    Parser(std::function<MaybeParse(std::string&)> const & fun)
         : d_fun(fun) {};
 
     auto run(std::string &in)
-        -> std::pair<A, std::string>
+        -> MaybeParse
     {
         return d_fun(in);
     }
@@ -77,57 +81,95 @@ Parser<bool> digit()
     return satisfies([](char ch){return ::isdigit(ch);});
 }
 
+Parser<bool> ischar(char the_char)
+{
+    return satisfies([&](char real_char){return the_char == real_char;});
+}
+
 template <typename A, typename B>
 Parser<std::pair<A, B>> operator >>(Parser<A> parser_a, Parser<B> parser_b)
 {
     auto lam = [&](std::string &in){
-        std::pair<A, std::string> result_a = parser_a.run(in);
-        if(result_a.first != nullptr)
-        {
-            std::pair<B, std::string> result_b = parser_b.run(result_a.second);
-            return std::make_pair(std::make_pair(result_a.first, result_b.first), result_b.second);
-        }
+        std::experimental::optional<std::pair<A, std::string>> result_a = parser_a.run(in);
+        if(!result_a)
+            return std::experimental::optional<std::pair<std::pair<A, B>, std::string>>{};
+        std::experimental::optional<std::pair<B, std::string>> result_b = parser_b.run(result_a->second);
+        if(!result_b)
+            return std::experimental::optional<std::pair<std::pair<A, B>, std::string>>{};
+        return std::experimental::make_optional( std::make_pair(std::make_pair(result_a->first, result_b->first), result_b->second));
     };
     return Parser<std::pair<A, B>>{lam};
 }
 
 template <typename A>
-Parser<A> operator >>(Parser<A> parser_a, Parser<void> parser_b)
+Parser<A> operator >>(Parser<A> parser_a, Parser<Empty> parser_b)
 {
     auto lam = [&](std::string &in){
-        std::pair<A, std::string> result_a = parser_a.run(in);
-        if(result_a.first != nullptr)
-        {
-            std::pair<void, std::string> result_b = parser_b.run(result_a.second);
-            return std::make_pair(result_a.first, result_b.second);
-        }
+        std::experimental::optional<std::pair<A, std::string>> result_a = parser_a.run(in);
+        if(!result_a)
+            return std::experimental::optional<std::pair<A, std::string>>{};
+        std::experimental::optional<std::pair<Empty, std::string>> result_b = parser_b.run(result_a->second);
+        if(!result_b)
+            return std::experimental::optional<std::pair<A, std::string>>{};
+        return std::experimental::make_optional( std::make_pair(result_a->first, result_b->second));
     };
     return Parser<A>{lam};
 }
 
 template <typename B>
-Parser<B> operator >>(Parser<void> parser_a, Parser<B> parser_b)
+Parser<B> operator >>(Parser<Empty> parser_a, Parser<B> parser_b)
 {
     auto lam = [&](std::string &in){
-        std::pair<void, std::string> result_a = parser_a.run(in);
-        if(result_a.first != nullptr)
-        {
-            std::pair<B, std::string> result_b = parser_b.run(result_a.second);
-            return std::make_pair(result_b.first, result_b.second);
-        }
+        std::experimental::optional<std::pair<Empty, std::string>> result_a = parser_a.run(in);
+        if(!result_a)
+            return std::experimental::optional<std::pair<B, std::string>>{};
+        std::experimental::optional<std::pair<B, std::string>> result_b = parser_b.run(result_a->second);
+        if(!result_b)
+            return std::experimental::optional<std::pair<B, std::string>>{};
+        return std::experimental::make_optional( std::make_pair(result_b->first, result_b->second));
     };
     return Parser<B>{lam};
 }
 
+
+// template <typename A>
+// Parser<A> operator >>(Parser<A> parser_a, Parser<void> parser_b)
+// {
+//     auto lam = [&](std::string &in){
+//         std::pair<A, std::string> result_a = parser_a.run(in);
+//         if(result_a)
+//         {
+//             std::pair<void, std::string> result_b = parser_b.run(result_a->second);
+//             return std::make_pair(result_a->first, result_b.second);
+//         }
+//     };
+//     return Parser<A>{lam};
+// }
+
+// template <typename B>
+// Parser<B> operator >>(Parser<Empty> parser_a, Parser<B> parser_b)
+// {
+//     auto lam = [&](std::string &in){
+//         std::pair<Empty, std::string> result_a = parser_a.run(in);
+//         if(result_a.first != nullptr)
+//         {
+//             std::pair<B, std::string> result_b = parser_b.run(result_a.second);
+//             return std::make_pair(result_b.first, result_b.second);
+//         }
+//     };
+//     return Parser<B>{lam};
+// }
+
 template <typename A>
-Parser<void> skip(Parser<A> parser)
+Parser<Empty> skip(Parser<A> parser)
 {
     auto lam = [&](std::string &in){
         auto result = parser.run(in);
-        if(result.first != nullptr)
-            return std::make_pair(false, in);
+        if(result)
+            return std::experimental::make_optional(std::make_pair(Empty{}, in));
+        return std::experimental::optional<std::pair<Empty, std::string>>{};
     };
-    return Parser<void>{lam};
+    return Parser<Empty>{lam};
 }
 
 
@@ -137,6 +179,6 @@ int main()
     str.assign((std::istreambuf_iterator<char>(std::cin)),
                std::istreambuf_iterator<char>());
     // auto result = alpha().run(str);
-    auto result = alpha() >> digit() >> alpha();
+    auto result = skip(digit()) >> alpha() >> digit() >> alpha() >> skip(digit());
     // std::cout << result.first;
 }
