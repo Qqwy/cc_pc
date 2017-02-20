@@ -63,10 +63,25 @@ ParserResult<ReturnType2> combine(std::function<ParserResult<ReturnType1>(std::i
     return result;
 }
 
+template <typename Result>
+struct Parser
+{
+    std::tuple<> operator()(std::string &in)
+        {
+            
+        };
+};
+
+template<typename T1, typename F>
+typename std::result_of<F(T1)>::type
+operator>>=(Parser<T1> t, F&& f) {
+
+    return std::forward<F>(f)(t.data);
+}
+
 ParserResult<char> matchChar(char ch, std::istream &in)
 {
-    std::function<ParserResult<char>(std::istream &)> foo = eatChar;
-    return combine(foo, [&](char real_char, std::istream &) -> ParserResult<char>{
+    return combine<char, char>(eatChar, [&](char real_char, std::istream &){
             if(ch != real_char)
                 return ParserResult<char>{};
             return ParserResult<char>{ch};

@@ -26,6 +26,7 @@ https://en.wikipedia.org/wiki/Bottom-up_parsing
 ** What is a 'Parser Combinator'?
 *** Build a Parser Combinator(?)
 https://www.youtube.com/watch?v=wzz0sm1YCWg
+http://www.cs.nott.ac.uk/~pszgmh/monparsing.pdf
 *** Small functions that take a string and return:
 **** On success: a piece of AST, together with the rest of the string.
 **** On failure: A descriptive error.
