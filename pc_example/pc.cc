@@ -54,34 +54,35 @@ struct Parser {
 // auto satisfy = Parser<decltype(lam)>{lam};
 
 template <typename F>
-Parser<bool> satisfies(F const &fun)
+Parser<char> satisfies(F const &fun)
 {
-    auto lam = [&](std::string &in){
+    auto lam = [&](std::string &in)
+    {
         if(in.empty())
-            return std::make_pair(false, in);
+            return std::experimental::optional<std::pair<char, std::string>>{};
         char ch = in[0];
         if (!fun(ch))
-            return std::make_pair(false, in);
-        return std::make_pair(true, in.substr(1, in.size()));
+            return std::experimental::optional<std::pair<char, std::string>>{};
+        return std::experimental::make_optional(std::make_pair(ch, in.substr(1, in.size())));
     };
-    return Parser<bool>{lam};
+    return Parser<char>{lam};
 }
 
-Parser<bool> space()
+Parser<char> space()
 {
     return satisfies([](char ch){return ch == ' ';});
 }
 
-Parser<bool> alpha()
+Parser<char> alpha()
 {
     return satisfies([](char ch){return ::isalpha(ch);});
 }
-Parser<bool> digit()
+Parser<char> digit()
 {
     return satisfies([](char ch){return ::isdigit(ch);});
 }
 
-Parser<bool> ischar(char the_char)
+Parser<char> ischar(char the_char)
 {
     return satisfies([&](char real_char){return the_char == real_char;});
 }
@@ -186,12 +187,12 @@ int main()
     std::string str;
     str.assign((std::istreambuf_iterator<char>(std::cin)),
                std::istreambuf_iterator<char>());
-    auto parser = skip(digit()) >> alpha() >> digit() >> alpha() >> skip(digit());
+    auto parser = alpha() >> digit();// skip(digit()) >> alpha() >> digit() >> alpha() >> skip(digit());
     auto result = parser.run(str);
     if(result)
     {
-        std::cout << "Parse success:\n"
         auto val = result.value();
+        std::cout << "Parse success:\n";
         std::cout << val.first;
     }
     else
