@@ -102,6 +102,22 @@ Parser<std::pair<A, B>> operator >>(Parser<A> parser_a, Parser<B> parser_b)
     return Parser<std::pair<A, B>>{lam};
 }
 
+template <typename A1, typename A2, typename B>
+auto operator >>(Parser<std::tuple<A1, A2>> parser_a, Parser<B> parser_b) -> Parser<decltype(std::tuple_cat(std::declval<std::tuple<A1, A2>>(), std::declval<B>()))>
+{
+    auto lam = [&](std::string &in){
+        std::experimental::optional<std::pair<std::tuple<A1, A2>, std::string>> result_a = parser_a.run(in);
+        if(!result_a)
+            return std::experimental::optional<std::pair<std::tuple<A1, A2, B>, std::string>>{};
+        std::experimental::optional<std::pair<B, std::string>> result_b = parser_b.run(result_a->second);
+        if(!result_b)
+            return std::experimental::optional<std::pair<std::tuple<A1, A2, B>, std::string>>{};
+        return std::experimental::make_optional( std::make_pair(std::tuple_cat(result_a->first, result_b->first), result_b->second));
+    };
+    return Parser<std::tuple<A1, A2, B>>{lam};
+}
+
+
 template <typename A>
 Parser<A> operator >>(Parser<A> parser_a, Parser<Empty> parser_b)
 {
@@ -132,34 +148,28 @@ Parser<B> operator >>(Parser<Empty> parser_a, Parser<B> parser_b)
     return Parser<B>{lam};
 }
 
-
-// template <typename A>
-// Parser<A> operator >>(Parser<A> parser_a, Parser<void> parser_b)
-// {
-//     auto lam = [&](std::string &in){
-//         std::pair<A, std::string> result_a = parser_a.run(in);
-//         if(result_a)
-//         {
-//             std::pair<void, std::string> result_b = parser_b.run(result_a->second);
-//             return std::make_pair(result_a->first, result_b.second);
-//         }
-//     };
-//     return Parser<A>{lam};
-// }
-
-// template <typename B>
-// Parser<B> operator >>(Parser<Empty> parser_a, Parser<B> parser_b)
-// {
-//     auto lam = [&](std::string &in){
-//         std::pair<Empty, std::string> result_a = parser_a.run(in);
-//         if(result_a.first != nullptr)
-//         {
-//             std::pair<B, std::string> result_b = parser_b.run(result_a.second);
-//             return std::make_pair(result_b.first, result_b.second);
-//         }
-//     };
-//     return Parser<B>{lam};
-// }
+template<size_t N>
+struct print_tuple{
+    template<typename... T>static typename std::enable_if<(N<sizeof...(T))>::type
+    print(std::ostream& os, const std::tuple<T...>& t) {
+        char quote = (std::is_convertible<decltype(std::get<N>(t)), std::string>::value) ? '"' : 0;
+        os << ", " << quote << std::get<N>(t) << quote;
+        print_tuple<N+1>::print(os,t);
+    }
+        template<typename... T>static typename std::enable_if<!(N<sizeof...(T))>::type
+        print(std::ostream&, const std::tuple<T...>&) {
+        }
+};
+std::ostream& operator<< (std::ostream& os, const std::tuple<>&) {
+    return os << "()";
+}
+template<typename T0, typename ...T> std::ostream&
+operator<<(std::ostream& os, const std::tuple<T0, T...>& t){
+    char quote = (std::is_convertible<T0, std::string>::value) ? '"' : 0;
+    os << '(' << quote << std::get<0>(t) << quote;
+    print_tuple<1>::print(os,t);
+    return os << ')';
+}
 
 template <typename A>
 Parser<Empty> skip(Parser<A> parser)
@@ -167,33 +177,33 @@ Parser<Empty> skip(Parser<A> parser)
     auto lam = [&](std::string &in){
         auto result = parser.run(in);
         if(result)
-            return std::experimental::make_optional(std::make_pair(Empty{}, in));
+            return std::experimental::make_optional(std::make_pair(Empty{}, result->second));
         return std::experimental::optional<std::pair<Empty, std::string>>{};
     };
     return Parser<Empty>{lam};
 }
 
 // Pretty print pair.
-
 template <typename A, typename B>
 std::ostream & operator<<(std::ostream &os, std::pair<A, B> pair)
 {
     os << "std::pair{" << pair.first << ", " << pair.second << "}";
     return os;
 }
+// Pretty print tuple.
 
 int main()
 {
     std::string str;
     str.assign((std::istreambuf_iterator<char>(std::cin)),
                std::istreambuf_iterator<char>());
-    auto parser = alpha() >> digit();// skip(digit()) >> alpha() >> digit() >> alpha() >> skip(digit());
+    auto parser = skip(digit()) >> alpha() >> digit() >> alpha() >> skip(digit());
     auto result = parser.run(str);
     if(result)
     {
         auto val = result.value();
         std::cout << "Parse success:\n";
-        std::cout << val.first;
+        std::cout << val.first << '\n';
     }
     else
     {

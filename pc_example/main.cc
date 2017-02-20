@@ -93,4 +93,6 @@ int main ()
 {
     matchChar('a', std::cin);
     matchChar('b', std::cin);
+    int a, b, c;
+    std::cin >> a = b = c;
 }
