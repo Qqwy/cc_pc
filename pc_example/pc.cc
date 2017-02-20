@@ -68,11 +68,11 @@ Parser<char> satisfies(F const &fun)
     auto lam = [&](std::string &in)
     {
         if(in.empty())
-            return optional<std::pair<char, std::string>>{};
+            return Parser<char>::MaybeParse{};
         char ch = in[0];
         if (!fun(ch))
-            return optional<std::pair<char, std::string>>{};
-        return make_optional(std::make_pair(ch, in.substr(1, in.size())));
+            return Parser<char>::MaybeParse{};
+        return Parser<char>::MaybeParse{Parser<char>::SuccessfullParse(ch, in.substr(1, in.size()))};
     };
     return Parser<char>{lam};
 }
@@ -96,7 +96,7 @@ Parser<char> ischar(char the_char)
     return satisfies([&](char real_char){return the_char == real_char;});
 }
 
-template <typename A, typename B, typename std::enable_if<!is_specialization_of<A, std::tuple>::value>::type = 0>
+template <typename A, typename B, typename std::enable_if<!is_specialization_of<A, std::tuple>::value, bool>::type = 0>
 Parser<std::tuple<A, B>> operator >>(Parser<A> parser_a, Parser<B> parser_b)
 {
     auto lam = [&](std::string &in){
@@ -111,7 +111,7 @@ Parser<std::tuple<A, B>> operator >>(Parser<A> parser_a, Parser<B> parser_b)
     return Parser<std::tuple<A, B>>{lam};
 }
 
-template <typename A, typename...As, typename B>
+template <typename A, typename...As, typename B, typename std::enable_if<!std::is_base_of<B, Empty>::value, bool>::type = 0>
 auto operator >>(Parser<std::tuple<A, As...>> parser_a, Parser<B> parser_b) -> Parser<decltype(std::tuple_cat(std::declval<std::tuple<A, As...>>(), std::declval<std::tuple<B>>()))>
 {
     auto lam = [&](std::string &in){
@@ -155,6 +155,19 @@ Parser<B> operator >>(Parser<Empty> parser_a, Parser<B> parser_b)
         return make_optional( std::make_pair(result_b->first, result_b->second));
     };
     return Parser<B>{lam};
+}
+
+template <typename A, typename Fun>
+auto operator,(Parser<A> parser_a, Fun const &fun) -> Parser<decltype(fun(std::declval<A>()))>
+{
+    auto lam = [&](std::string &in)
+        {
+            optional<std::pair<A, std::string>> result_a = parser_a.run(in);
+            if(!result_a)
+                return optional<std::pair<decltype(fun(std::declval<A>())), std::string>>{};
+            return make_optional(std::make_pair(fun(result_a->first), result_a->second));
+        };
+    return Parser<decltype(fun(std::declval<A>()))>{lam};
 }
 
 template<size_t N>
@@ -207,15 +220,15 @@ int main()
     str.assign((std::istreambuf_iterator<char>(std::cin)),
                std::istreambuf_iterator<char>());
     auto parser = skip(digit()) >> alpha() >> digit() >> alpha() >> skip(digit());
-    auto result = parser.run(str);
+    auto digit_parser = (skip(space()) >> digit(), [](char digit){return static_cast<int>(digit - '0');});
+    auto result = digit_parser.run(str);
     if(result)
     {
-        auto val = result.value();
         std::cout << "Parse success:\n";
-        std::cout << val.first << '\n';
+        std::cout << result->first << '\n';
+        std::cout << "Unmatched rest string: \n";
+        std::cout << result->second;
     }
     else
-    {
         std::cout << "Parsing failed\n";
-    }
 }
