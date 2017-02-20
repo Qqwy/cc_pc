@@ -102,19 +102,19 @@ Parser<std::tuple<A, B>> operator >>(Parser<A> parser_a, Parser<B> parser_b)
     return Parser<std::tuple<A, B>>{lam};
 }
 
-template <typename A1, typename A2, typename B>
-auto operator >>(Parser<std::tuple<A1, A2>> parser_a, Parser<B> parser_b) -> Parser<decltype(std::tuple_cat(std::declval<std::tuple<A1, A2>>(), std::declval<B>()))>
+template <typename...A, typename B>
+auto operator >>(Parser<std::tuple<A...>> parser_a, Parser<B> parser_b) -> Parser<decltype(std::tuple_cat(std::declval<std::tuple<A...>>(), std::declval<B>()))>
 {
     auto lam = [&](std::string &in){
-        std::experimental::optional<std::pair<std::tuple<A1, A2>, std::string>> result_a = parser_a.run(in);
+        std::experimental::optional<std::pair<std::tuple<A...>, std::string>> result_a = parser_a.run(in);
         if(!result_a)
-            return std::experimental::optional<std::pair<std::tuple<A1, A2, B>, std::string>>{};
+            return std::experimental::optional<std::pair<std::tuple<A..., B>, std::string>>{};
         std::experimental::optional<std::pair<B, std::string>> result_b = parser_b.run(result_a->second);
         if(!result_b)
-            return std::experimental::optional<std::pair<std::tuple<A1, A2, B>, std::string>>{};
+            return std::experimental::optional<std::pair<std::tuple<A..., B>, std::string>>{};
         return std::experimental::make_optional( std::make_pair(std::tuple_cat(result_a->first, result_b->first), result_b->second));
     };
-    return Parser<std::tuple<A1, A2, B>>{lam};
+    return Parser<std::tuple<A..., B>>{lam};
 }
 
 
