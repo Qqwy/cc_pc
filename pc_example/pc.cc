@@ -88,18 +88,18 @@ Parser<char> ischar(char the_char)
 }
 
 template <typename A, typename B>
-Parser<std::pair<A, B>> operator >>(Parser<A> parser_a, Parser<B> parser_b)
+Parser<std::tuple<A, B>> operator >>(Parser<A> parser_a, Parser<B> parser_b)
 {
     auto lam = [&](std::string &in){
         std::experimental::optional<std::pair<A, std::string>> result_a = parser_a.run(in);
         if(!result_a)
-            return std::experimental::optional<std::pair<std::pair<A, B>, std::string>>{};
+            return std::experimental::optional<std::pair<std::tuple<A, B>, std::string>>{};
         std::experimental::optional<std::pair<B, std::string>> result_b = parser_b.run(result_a->second);
         if(!result_b)
-            return std::experimental::optional<std::pair<std::pair<A, B>, std::string>>{};
-        return std::experimental::make_optional( std::make_pair(std::make_pair(result_a->first, result_b->first), result_b->second));
+            return std::experimental::optional<std::pair<std::tuple<A, B>, std::string>>{};
+        return std::experimental::make_optional( std::make_pair(std::make_tuple(result_a->first, result_b->first), result_b->second));
     };
-    return Parser<std::pair<A, B>>{lam};
+    return Parser<std::tuple<A, B>>{lam};
 }
 
 template <typename A1, typename A2, typename B>
@@ -161,14 +161,14 @@ struct print_tuple{
         }
 };
 std::ostream& operator<< (std::ostream& os, const std::tuple<>&) {
-    return os << "()";
+    return os << "std::tuple{}";
 }
 template<typename T0, typename ...T> std::ostream&
 operator<<(std::ostream& os, const std::tuple<T0, T...>& t){
     char quote = (std::is_convertible<T0, std::string>::value) ? '"' : 0;
-    os << '(' << quote << std::get<0>(t) << quote;
+    os << "std::tuple{" << quote << std::get<0>(t) << quote;
     print_tuple<1>::print(os,t);
-    return os << ')';
+    return os << '}';
 }
 
 template <typename A>
