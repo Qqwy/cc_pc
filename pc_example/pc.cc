@@ -2,6 +2,7 @@
 #include <string>
 #include <functional>
 #include <experimental/optional>
+using namespace std::experimental;
 
 // template <typename F>
 // struct Parser
@@ -22,7 +23,7 @@ class Empty{};
 template <typename A>
 struct Parser {
     typedef std::pair<A, std::string> SuccessfullParse;
-    typedef std::experimental::optional<SuccessfullParse> MaybeParse;
+    typedef optional<SuccessfullParse> MaybeParse;
 
     std::function<MaybeParse(std::string&)> d_fun;
     Parser(std::function<MaybeParse(std::string&)> const & fun)
@@ -59,11 +60,11 @@ Parser<char> satisfies(F const &fun)
     auto lam = [&](std::string &in)
     {
         if(in.empty())
-            return std::experimental::optional<std::pair<char, std::string>>{};
+            return optional<std::pair<char, std::string>>{};
         char ch = in[0];
         if (!fun(ch))
-            return std::experimental::optional<std::pair<char, std::string>>{};
-        return std::experimental::make_optional(std::make_pair(ch, in.substr(1, in.size())));
+            return optional<std::pair<char, std::string>>{};
+        return make_optional(std::make_pair(ch, in.substr(1, in.size())));
     };
     return Parser<char>{lam};
 }
@@ -91,30 +92,30 @@ template <typename A, typename B>
 Parser<std::tuple<A, B>> operator >>(Parser<A> parser_a, Parser<B> parser_b)
 {
     auto lam = [&](std::string &in){
-        std::experimental::optional<std::pair<A, std::string>> result_a = parser_a.run(in);
+        optional<std::pair<A, std::string>> result_a = parser_a.run(in);
         if(!result_a)
-            return std::experimental::optional<std::pair<std::tuple<A, B>, std::string>>{};
-        std::experimental::optional<std::pair<B, std::string>> result_b = parser_b.run(result_a->second);
+            return optional<std::pair<std::tuple<A, B>, std::string>>{};
+        optional<std::pair<B, std::string>> result_b = parser_b.run(result_a->second);
         if(!result_b)
-            return std::experimental::optional<std::pair<std::tuple<A, B>, std::string>>{};
-        return std::experimental::make_optional( std::make_pair(std::make_tuple(result_a->first, result_b->first), result_b->second));
+            return optional<std::pair<std::tuple<A, B>, std::string>>{};
+        return make_optional( std::make_pair(std::make_tuple(result_a->first, result_b->first), result_b->second));
     };
     return Parser<std::tuple<A, B>>{lam};
 }
 
-template <typename...A, typename B>
-auto operator >>(Parser<std::tuple<A...>> parser_a, Parser<B> parser_b) -> Parser<decltype(std::tuple_cat(std::declval<std::tuple<A...>>(), std::declval<B>()))>
+template <typename A, typename...As, typename B>
+auto operator >>(Parser<std::tuple<A, As...>> parser_a, Parser<B> parser_b) -> Parser<decltype(std::tuple_cat(std::declval<std::tuple<A, As...>>(), std::declval<std::tuple<B>>()))>
 {
     auto lam = [&](std::string &in){
-        std::experimental::optional<std::pair<std::tuple<A...>, std::string>> result_a = parser_a.run(in);
+        optional<std::pair<std::tuple<A, As...>, std::string>> result_a = parser_a.run(in);
         if(!result_a)
-            return std::experimental::optional<std::pair<std::tuple<A..., B>, std::string>>{};
-        std::experimental::optional<std::pair<B, std::string>> result_b = parser_b.run(result_a->second);
+            return optional<std::pair<std::tuple<A, As..., B>, std::string>>{};
+        optional<std::pair<B, std::string>> result_b = parser_b.run(result_a->second);
         if(!result_b)
-            return std::experimental::optional<std::pair<std::tuple<A..., B>, std::string>>{};
-        return std::experimental::make_optional( std::make_pair(std::tuple_cat(result_a->first, result_b->first), result_b->second));
+            return optional<std::pair<std::tuple<A, As..., B>, std::string>>{};
+        return make_optional( std::make_pair(std::tuple_cat(result_a->first, std::make_tuple(result_b->first)), result_b->second));
     };
-    return Parser<std::tuple<A..., B>>{lam};
+    return Parser<std::tuple<A, As..., B>>{lam};
 }
 
 
@@ -122,13 +123,13 @@ template <typename A>
 Parser<A> operator >>(Parser<A> parser_a, Parser<Empty> parser_b)
 {
     auto lam = [&](std::string &in){
-        std::experimental::optional<std::pair<A, std::string>> result_a = parser_a.run(in);
+        optional<std::pair<A, std::string>> result_a = parser_a.run(in);
         if(!result_a)
-            return std::experimental::optional<std::pair<A, std::string>>{};
-        std::experimental::optional<std::pair<Empty, std::string>> result_b = parser_b.run(result_a->second);
+            return optional<std::pair<A, std::string>>{};
+        optional<std::pair<Empty, std::string>> result_b = parser_b.run(result_a->second);
         if(!result_b)
-            return std::experimental::optional<std::pair<A, std::string>>{};
-        return std::experimental::make_optional( std::make_pair(result_a->first, result_b->second));
+            return optional<std::pair<A, std::string>>{};
+        return make_optional( std::make_pair(result_a->first, result_b->second));
     };
     return Parser<A>{lam};
 }
@@ -137,13 +138,13 @@ template <typename B>
 Parser<B> operator >>(Parser<Empty> parser_a, Parser<B> parser_b)
 {
     auto lam = [&](std::string &in){
-        std::experimental::optional<std::pair<Empty, std::string>> result_a = parser_a.run(in);
+        optional<std::pair<Empty, std::string>> result_a = parser_a.run(in);
         if(!result_a)
-            return std::experimental::optional<std::pair<B, std::string>>{};
-        std::experimental::optional<std::pair<B, std::string>> result_b = parser_b.run(result_a->second);
+            return optional<std::pair<B, std::string>>{};
+        optional<std::pair<B, std::string>> result_b = parser_b.run(result_a->second);
         if(!result_b)
-            return std::experimental::optional<std::pair<B, std::string>>{};
-        return std::experimental::make_optional( std::make_pair(result_b->first, result_b->second));
+            return optional<std::pair<B, std::string>>{};
+        return make_optional( std::make_pair(result_b->first, result_b->second));
     };
     return Parser<B>{lam};
 }
@@ -177,8 +178,8 @@ Parser<Empty> skip(Parser<A> parser)
     auto lam = [&](std::string &in){
         auto result = parser.run(in);
         if(result)
-            return std::experimental::make_optional(std::make_pair(Empty{}, result->second));
-        return std::experimental::optional<std::pair<Empty, std::string>>{};
+            return make_optional(std::make_pair(Empty{}, result->second));
+        return optional<std::pair<Empty, std::string>>{};
     };
     return Parser<Empty>{lam};
 }
