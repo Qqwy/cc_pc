@@ -186,12 +186,16 @@ int main()
     std::string str;
     str.assign((std::istreambuf_iterator<char>(std::cin)),
                std::istreambuf_iterator<char>());
-    // auto result = alpha().run(str);
     auto parser = skip(digit()) >> alpha() >> digit() >> alpha() >> skip(digit());
     auto result = parser.run(str);
     if(result)
     {
+        std::cout << "Parse success:\n"
         auto val = result.value();
         std::cout << val.first;
+    }
+    else
+    {
+        std::cout << "Parsing failed\n";
     }
 }
