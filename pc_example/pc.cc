@@ -2,7 +2,15 @@
 #include <string>
 #include <functional>
 #include <experimental/optional>
+#include <type_traits>
 using namespace std::experimental;
+
+
+//! Tests if T is a specialization of Template
+template <typename T, template <typename...> class Template>
+struct is_specialization_of : std::false_type {};
+template <template <typename...> class Template, typename... Args>
+struct is_specialization_of<Template<Args...>, Template> : std::true_type {};
 
 // template <typename F>
 // struct Parser
@@ -88,7 +96,7 @@ Parser<char> ischar(char the_char)
     return satisfies([&](char real_char){return the_char == real_char;});
 }
 
-template <typename A, typename B>
+template <typename A, typename B, typename std::enable_if<!is_specialization_of<A, std::tuple>::value>::type = 0>
 Parser<std::tuple<A, B>> operator >>(Parser<A> parser_a, Parser<B> parser_b)
 {
     auto lam = [&](std::string &in){
