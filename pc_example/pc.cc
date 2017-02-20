@@ -172,6 +172,14 @@ Parser<Empty> skip(Parser<A> parser)
     return Parser<Empty>{lam};
 }
 
+// Pretty print pair.
+
+template <typename A, typename B>
+std::ostream & operator<<(std::ostream &os, std::pair<A, B> pair)
+{
+    os << "std::pair{" << pair.first << ", " << pair.second << "}";
+    return os;
+}
 
 int main()
 {
@@ -179,6 +187,11 @@ int main()
     str.assign((std::istreambuf_iterator<char>(std::cin)),
                std::istreambuf_iterator<char>());
     // auto result = alpha().run(str);
-    auto result = skip(digit()) >> alpha() >> digit() >> alpha() >> skip(digit());
-    // std::cout << result.first;
+    auto parser = skip(digit()) >> alpha() >> digit() >> alpha() >> skip(digit());
+    auto result = parser.run(str);
+    if(result)
+    {
+        auto val = result.value();
+        std::cout << val.first;
+    }
 }
