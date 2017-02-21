@@ -69,15 +69,22 @@ struct Parser {
     typedef optional<SuccessfullParse> MaybeParse;
 
     std::function<MaybeParse(std::string&)> d_fun;
-    Parser(std::function<MaybeParse(std::string&)> const & fun)
+    Parser(std::function<MaybeParse(std::string&)> const &fun)
         : d_fun(fun) {};
 
-    auto run(std::string &in)
+    auto run(std::string &in) const
         -> MaybeParse
     {
         return d_fun(in);
     }
 };
+
+template <typename A>
+std::ostream & operator<<(std::ostream &os, Parser<A> &parser_a)
+{
+    os << "Parser{}";
+    return os;
+}
 
 
 template <typename F>
@@ -114,8 +121,9 @@ Parser<char> ischar(char the_char)
     return satisfies([&](char real_char){return the_char == real_char;});
 }
 
-template <typename A, typename B, typename std::enable_if<!is_specialization_of<A, std::tuple>::value, bool>::type = 0>
-Parser<std::tuple<A, B>> operator >>(Parser<A> parser_a, Parser<B> parser_b)
+//template <typename A, typename B, typename std::enable_if<!is_specialization_of<A, std::tuple>::value, bool>::type = 0>
+template <typename A, typename B>
+Parser<std::tuple<A, B>> operator >>(Parser<A> const &parser_a, Parser<B> const &parser_b)
 {
     auto lam = [&](std::string &in){
         optional<std::pair<A, std::string>> result_a = parser_a.run(in);
@@ -129,24 +137,24 @@ Parser<std::tuple<A, B>> operator >>(Parser<A> parser_a, Parser<B> parser_b)
     return Parser<std::tuple<A, B>>{lam};
 }
 
-template <typename A, typename...As, typename B, typename std::enable_if<!std::is_base_of<B, Empty>::value, bool>::type = 0>
-auto operator >>(Parser<std::tuple<A, As...>> parser_a, Parser<B> parser_b) -> Parser<decltype(std::tuple_cat(std::declval<std::tuple<A, As...>>(), std::declval<std::tuple<B>>()))>
-{
-    auto lam = [&](std::string &in){
-        optional<std::pair<std::tuple<A, As...>, std::string>> result_a = parser_a.run(in);
-        if(!result_a)
-            return optional<std::pair<std::tuple<A, As..., B>, std::string>>{};
-        optional<std::pair<B, std::string>> result_b = parser_b.run(result_a->second);
-        if(!result_b)
-            return optional<std::pair<std::tuple<A, As..., B>, std::string>>{};
-        return make_optional( std::make_pair(std::tuple_cat(result_a->first, std::make_tuple(result_b->first)), result_b->second));
-    };
-    return Parser<std::tuple<A, As..., B>>{lam};
-}
+// template <typename...As, typename B, typename std::enable_if<!std::is_base_of<B, Empty>::value, bool>::type = 0>
+// auto operator >>(Parser<std::tuple<As...>> const &parser_a, Parser<B> const &parser_b) -> Parser<decltype(std::tuple_cat(std::declval<std::tuple<As...>>(), std::declval<std::tuple<B>>()))>
+// {
+//     auto lam = [&](std::string &in){
+//         optional<std::pair<std::tuple<As...>, std::string>> result_a = parser_a.run(in);
+//         if(!result_a)
+//             return optional<std::pair<std::tuple<As..., B>, std::string>>{};
+//         optional<std::pair<B, std::string>> result_b = parser_b.run(result_a->second);
+//         if(!result_b)
+//             return optional<std::pair<std::tuple<As..., B>, std::string>>{};
+//         return make_optional( std::make_pair(std::tuple_cat(result_a->first, std::make_tuple(result_b->first)), result_b->second));
+//     };
+//     return Parser<std::tuple<As..., B>>{lam};
+// }
 
 
 template <typename A>
-Parser<A> operator >>(Parser<A> parser_a, Parser<Empty> parser_b)
+Parser<A> operator >>(Parser<A> const &parser_a, Parser<Empty> const &parser_b)
 {
     auto lam = [&](std::string &in){
         optional<std::pair<A, std::string>> result_a = parser_a.run(in);
@@ -161,7 +169,7 @@ Parser<A> operator >>(Parser<A> parser_a, Parser<Empty> parser_b)
 }
 
 template <typename B>
-Parser<B> operator >>(Parser<Empty> parser_a, Parser<B> parser_b)
+Parser<B> operator >>(Parser<Empty> const &parser_a, Parser<B> const &parser_b)
 {
     auto lam = [&](std::string &in){
         optional<std::pair<Empty, std::string>> result_a = parser_a.run(in);
@@ -176,16 +184,36 @@ Parser<B> operator >>(Parser<Empty> parser_a, Parser<B> parser_b)
 }
 
 template <typename A, typename Fun>
-auto operator,(Parser<A> parser_a, Fun const &fun) -> Parser<decltype(fun(std::declval<A>()))>
+auto fmap(Parser<A> parser_a, Fun const &fun) -> Parser<decltype(fun(std::declval<A>()))>
 {
+    std::cout << "OUTSIDE OF LAMBDA!\n" << parser_a;
     auto lam = [&](std::string &in)
         {
-            optional<std::pair<A, std::string>> result_a = parser_a.run(in);
+            std::cout << "INSIDE OF LAMBDA!\n" << parser_a;
+            optional<std::pair<A, std::string>> result_a;
+            result_a = parser_a.run(in);
+            std::cout << "AFTER RUNNING PARSER\n";
+            // std::cout << "Result:"<< !!result_a;
             if(!result_a)
                 return optional<std::pair<decltype(fun(std::declval<A>())), std::string>>{};
             return make_optional(std::make_pair(fun(result_a->first), result_a->second));
         };
     return Parser<decltype(fun(std::declval<A>()))>{lam};
+}
+
+template <typename A, typename ReturnType>
+Parser<ReturnType> fmap2(Parser<A> parser_a, std::function<ReturnType(A)> const &fun)
+{
+    std::cout << "OUTSIDE OF LAMBDA2!\n" << parser_a;
+    auto lam = [&](std::string &in)
+        {
+            std::cout << "INSIDE OF LAMBDA!\n" << parser_a;
+            auto result = parser_a.run(in);
+            if(!result)
+                return optional<std::pair<ReturnType, std::string>>{};
+            return make_optional(std::make_pair(fun(result->first), result->second));
+        };
+    return Parser<ReturnType>{lam};
 }
 
 template <typename A>
@@ -201,7 +229,7 @@ Parser<Empty> skip(Parser<A> parser)
 }
 
 template <typename A>
-Parser<A> operator|(Parser<A> parser_a, Parser<A> parser_b)
+Parser<A> operator|(Parser<A> const &parser_a, Parser<A> const &parser_b)
 {
     auto lam = [&](std::string &in)
         {
@@ -221,9 +249,9 @@ Parser<char> alnum()
 }
 
 template <typename A>
-Parser<std::vector<A>> many(Parser<A> parser_a)
+Parser<std::vector<A>> many(Parser<A> const &parser_a)
 {
-    auto lam = [&](std::string &in)
+    auto lam = [&](std::string in)
         {
             std::vector<A> vec{};
             while (true)
@@ -258,19 +286,32 @@ Parser<std::vector<A>> many(Parser<A> parser_a)
 //     return Parser<std::vector<A>>{lam};
 // }
 
-template <typename A>
-Parser<std::vector<A>> many1(Parser<A> parser_a)
-{
-    auto prepend_a = [&](std::tuple<A, std::vector<A>> tup){
-        A first;
-        std::vector<A> rest;
-        std::tie(first, rest) = tup;
-        std::cout << "Prepending" << first << " to " << rest << '\n';
-        rest.insert(rest.begin(), first);
-        return rest;
-    };
+// template <typename A>
+// // Parser<std::vector<A>> many1(Parser<A> parser_a)
+// Parser<std::tuple<A, A, A>> many1(Parser<A> parser_a)
+// {
+//     // auto prepend_a = [&](std::tuple<A, std::vector<A>> tup){
+//     //     // std::cout << "TEST!\n";
+//     //     // A first;
+//     //     // std::vector<A> rest;
+//     //     // std::tie(first, rest) = tup;
+//     //     // std::cout << "Prepending" << first << " to " << rest << '\n';
+//     //     // rest.insert(rest.begin(), first);
+//     //     // return rest;
+//     //     return std::get<1>(tup);
+//     // };
+//     // auto parser1 = parser_a >> parser_a >> parser_a;//many(parser_a);
+//     // std::function<char(std::tuple<char, char, char>)> lam = [&](std::tuple<char, char, char> chars) -> char {return std::get<0>(chars);};
+//     // return fmap2(parser1, lam);
+//     auto parser2 = digit() >> digit() >> digit();
+//     return parser2;
+// }
 
-    return (parser_a >> many(parser_a), prepend_a);
+template <typename A>
+Parser<std::tuple<A, A>> many1(Parser<A> parser_a)
+{
+    //return parser_a >> parser_a >> parser_a;
+    return digit() >> digit();
 }
 
 int main()
@@ -279,8 +320,9 @@ int main()
     str.assign((std::istreambuf_iterator<char>(std::cin)),
                std::istreambuf_iterator<char>());
     auto parser = skip(digit()) >> alpha() >> digit() >> alpha() >> skip(digit());
-    auto digit_parser = (skip(space()) >> digit(), [](char digit){return static_cast<int>(digit - '0');});
-    auto digit_parser2 = (many(digit()));
+    std::function<int(std::tuple<std::tuple<char,char>, char>)> convert_lambda = [](std::tuple<std::tuple<char, char>, char> digits){return static_cast<int>(std::get<1>(digits) - '0');};
+    auto digit_parser = fmap2(space() >> digit() >> digit(), convert_lambda);
+    auto digit_parser2 = (many1(digit()));
     auto result = digit_parser2.run(str);
     if(result)
     {
