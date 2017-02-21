@@ -100,7 +100,7 @@ public:
     template <typename OtherResult>
     Parser<std::tuple<Result, OtherResult>> sequence(Parser<OtherResult> parser_b)
     {
-        std::function<ParseResult<std::tuple<Result, OtherResult>>(std::string const &)> lambda = [&](std::string const &in)
+        auto lambda = [&](std::string const &in)
         {
             ParseResult<Result> result_a = this->run(in);
             if(!result_a)
@@ -110,41 +110,42 @@ public:
                 return ParseResult<std::tuple<Result, OtherResult>>{};
             return ParseResult<std::tuple<Result, OtherResult>>{std::make_tuple(result_a.content(), result_b.content()), result_b.unparsed_rest()};
         };
-        return Parser{lambda};
+        return Parser<std::tuple<Result, OtherResult>>{lambda};
     }
+
 };
 
-// // Specialization to sequence tuple results.
-// template <typename... Results>
-// class Parser<std::tuple<Results...>>
-// {
-//     typedef std::function<ParseResult<std::tuple<Results...>>(std::string const &)> ParseFunction;
-//     ParseFunction d_fun;
-// public:
-//     Parser(ParseFunction fun)
-//         :
-//         d_fun(fun)
-//     {};
-//     ParseResult<std::tuple<Results...>> run(std::string const &in) const
-//     {
-//         return d_fun(in);
-//     }
-//     template <typename OtherResult>
-//     Parser<std::tuple<Results..., OtherResult>> sequence(Parser<OtherResult> parser_b)
-//     {
-//         auto lambda = [&](std::string const &in)
-//         {
-//             ParseResult<std::tuple<Results...>> result_a = this->run(in);
-//             if(!result_a)
-//                 return ParseResult<std::tuple<Results..., OtherResult>>{};
-//             ParseResult<OtherResult> result_b = parser_b.run(result_a.unparsed_rest());
-//             if(!result_b)
-//                 return ParseResult<std::tuple<Results..., OtherResult>>{};
-//             return ParseResult<std::tuple<Results..., OtherResult>>{std::tuple_cat(result_a.content(), std::make_tuple(result_b.content())), result_b.unparsed_rest()};
-//         };
-//         return Parser{lambda};
-//     }
-// };
+// Specialization to sequence tuple results.
+template <typename... Results>
+class Parser<std::tuple<Results...>>
+{
+    typedef std::function<ParseResult<std::tuple<Results...>>(std::string const &)> ParseFunction;
+    ParseFunction d_fun;
+public:
+    Parser(ParseFunction fun)
+        :
+        d_fun(fun)
+    {};
+    ParseResult<std::tuple<Results...>> run(std::string const &in) const
+    {
+        return d_fun(in);
+    }
+    template <typename OtherResult>
+    Parser<std::tuple<Results..., OtherResult>> sequence(Parser<OtherResult> parser_b)
+    {
+        auto lambda = [&](std::string const &in)
+        {
+            ParseResult<std::tuple<Results...>> result_a = this->run(in);
+            if(!result_a)
+                return ParseResult<std::tuple<Results..., OtherResult>>{};
+            ParseResult<OtherResult> result_b = parser_b.run(result_a.unparsed_rest());
+            if(!result_b)
+                return ParseResult<std::tuple<Results..., OtherResult>>{};
+            return ParseResult<std::tuple<Results..., OtherResult>>{std::tuple_cat(result_a.content(), std::make_tuple(result_b.content())), result_b.unparsed_rest()};
+        };
+        return Parser<std::tuple<Results..., OtherResult>>{lambda};
+    }
+};
 
 // Simple parsers
 
