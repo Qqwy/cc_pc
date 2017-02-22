@@ -128,8 +128,10 @@ namespace Combi
             return d_fun(in);
         }
 
+        // Simple combinators:
+
         template <typename OtherResult>
-        auto sequence(Parser<OtherResult> const &parser_b) const -> decltype(auto)
+        auto operator>>(Parser<OtherResult> const &parser_b) const -> decltype(auto)
         {
             typedef decltype(concatenateToTuple(std::declval<Result>(), std::declval<OtherResult>())) result_t;
             auto lambda = [&](std::string const &in)
@@ -147,7 +149,7 @@ namespace Combi
             return Parser<result_t>{lambda};
         }
 
-        auto orelse(Parser<Result> const &parser_b) const
+        auto operator|(Parser<Result> const &parser_b) const
         {
             auto lambda = [&](std::string const &in)
             {
@@ -159,7 +161,46 @@ namespace Combi
             };
             return Parser<Result>{lambda};
         }
+
+        template<typename Function>
+        auto transform(Function const &fun) const -> Parser<decltype(fun(std::declval<Result>()))>
+            {
+                auto lambda = [&](std::string const &in)
+                {
+                    ParseResults<Result> a_results = d_fun(in);
+                    ParseResults<decltype(fun(std::declval<Result>()))> results;
+                    for(ParseResult<Result> result_a : a_results)
+                    {
+                        results.push_back(ParseResult<decltype(fun(std::declval<Result>()))>{fun(result_a.content()), result_a.unparsed_rest()});
+                    }
+                    return results;
+                };
+                return Parser<decltype(fun(std::declval<Result>()))>{lambda};
+            };
     };
+
+
+    // More Combinators
+
+    // TODO: Fix this.
+    template <typename A>
+    Parser<std::vector<A>> many(Parser<A> const &parser_a)
+    {
+        auto lam = [&](std::string in)
+        {
+            std::vector<A> vec{};
+            while (true)
+            {
+                auto parse_result = parser_a.run(in);
+                if(!parse_result)
+                    break;
+                vec.push_back(parse_result.content());
+                in = parse_result.unparsed_rest();
+            }
+            return ParseResult<std::vector<A>>{vec, in};
+        };
+        return Parser<std::vector<A>>{lam};
+    }
 
 
 
@@ -181,49 +222,16 @@ namespace Combi
     }
 
     static const Parser<char> space = satisfies([](char ch){return ch == ' ';});
-    static const Parser<char> alpha = satisfies([](char ch){return ::isalpha(ch);});
     static const Parser<char> digit = satisfies([](char ch){return ::isdigit(ch);});
+    static const Parser<char> alpha = satisfies([](char ch){return ::isalpha(ch);});
+    static const Parser<char> alnum = digit | alpha;
+    static const Parser<int>  digit2 = digit.transform([](char ch){ return ch - '0';});
 
     Parser<char> ischar(char the_char)
     {
         return satisfies([&](char real_char){return the_char == real_char;});
     }
-
-    // Combinators
-
-    template<typename A, typename B>
-    auto operator>>(Parser<A> const &parser_a, Parser<B> const &parser_b) -> decltype(std::declval<Parser<A>>().sequence(std::declval<Parser<B>>()))
-    {
-        return parser_a.sequence(parser_b);
-    }
-
-    template <typename A>
-    auto operator|(Parser<A> const &parser_a, Parser<A> const &parser_b)
-    {
-        return parser_a.orelse(parser_b);
-    }
-
-
-
-    // TODO: Fix this.
-    template <typename A>
-    Parser<std::vector<A>> many(Parser<A> const &parser_a)
-    {
-        auto lam = [&](std::string in)
-            {
-                std::vector<A> vec{};
-                while (true)
-                {
-                    auto parse_result = parser_a.run(in);
-                    if(!parse_result)
-                        break;
-                    vec.push_back(parse_result.content());
-                    in = parse_result.unparsed_rest();
-                }
-                return ParseResult<std::vector<A>>{vec, in};
-            };
-        return Parser<std::vector<A>>{lam};
-    }
+    // static const Parser<std::vector<char>> digits = many(digit);
 }
 
 int main()
@@ -234,7 +242,7 @@ int main()
     using namespace Combi;
 
     // auto digit_parser = digit() >> alpha() >> alpha();
-    auto digit_parser = (digit  | alpha) >> digit >> digit;//(digit() >> digit()) >> (digit() >> digit());
+    auto digit_parser = (digit | alpha) >> digit2 >> digit2;//(digit() >> digit()) >> (digit() >> digit());
     auto parse_results = digit_parser.run(input);
     if(!parse_results.empty())
     {
