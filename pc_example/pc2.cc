@@ -116,6 +116,29 @@ public:
         };
         return Parser<std::tuple<Result, OtherResult>>{lambda};
     }
+
+    // Specialization for tuples.
+    template <typename... OtherResults>
+    Parser<std::tuple<Result, OtherResults...>> sequence(Parser<std::tuple<OtherResults...>> const &parser_b) const
+        {
+            auto lambda = [&](std::string const &in)
+                {
+                    ParseResult<Result> result_a = this->run(in);
+                    bool testA = result_a;
+                    if(!testA)
+                        return ParseResult<std::tuple<Result, OtherResults...>>{};
+                    ParseResult<std::tuple<OtherResults...>> result_b = parser_b.run(result_a.unparsed_rest());
+                    bool testB = result_b;
+                    // std::cout << "Result B" << testB << '\n';
+                    if(!testB)
+                        return ParseResult<std::tuple<Result, OtherResults...>>{};
+                    return ParseResult<std::tuple<Result, OtherResults...>>{std::tuple_cat(std::make_tuple(result_a.content()), result_b.content()), result_b.unparsed_rest()};
+                };
+            return Parser<std::tuple<Result, OtherResults...>>{lambda};
+        }
+
+
+
 };
 
 
@@ -150,6 +173,23 @@ public:
         };
         return Parser<std::tuple<Results..., OtherResult>>{lambda};
     }
+
+    template <typename... OtherResults>
+        Parser<std::tuple<Results..., OtherResults...>> sequence(Parser<std::tuple<OtherResults...>> const &parser_b) const
+    {
+        auto lambda = [&](std::string const &in)
+            {
+                ParseResult<std::tuple<Results...>> result_a = this->run(in);
+                if(!result_a)
+                    return ParseResult<std::tuple<Results..., OtherResults...>>{};
+                ParseResult<std::tuple<OtherResults...>> result_b = parser_b.run(result_a.unparsed_rest());
+                if(!result_b)
+                    return ParseResult<std::tuple<Results..., OtherResults...>>{};
+                return ParseResult<std::tuple<Results..., OtherResults...>>{std::tuple_cat(result_a.content(), result_b.content()), result_b.unparsed_rest()};
+            };
+        return Parser<std::tuple<Results..., OtherResults...>>{lambda};
+    }
+
 };
 
 // Simple parsers
@@ -230,7 +270,7 @@ int main()
                  std::istreambuf_iterator<char>());
 
     // auto digit_parser = digit() >> alpha() >> alpha();
-    auto digit_parser = digit() >> digit() >> digit();
+    auto digit_parser = (digit() >> digit()) >> (digit() >> digit());
     auto parse_result = digit_parser.run(input);
     if(parse_result)
     {
