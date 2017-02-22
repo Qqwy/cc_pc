@@ -8,6 +8,9 @@
 
 
 
+
+
+
 // Pretty print tuple.
 template<size_t N>
 struct print_tuple{
@@ -42,6 +45,32 @@ std::ostream &operator<< (std::ostream& os, std::vector<A> const &vector)
     return os;
 }
 
+
+// Concatenate two datatypes to a tuple.
+// If one or both already is a tuple, prepend/append the other.
+// If both are tuples, combine them.
+template <typename A, typename B>
+inline std::tuple<A, B> concatenateToTuple(A const &elem_a, B const &elem_b)
+{
+    return std::make_tuple(elem_a, elem_b);
+}
+
+template <typename A, typename... Bs>
+inline std::tuple<A, Bs...> concatenateToTuple(A const &elem_a, std::tuple<Bs...> const &elem_b)
+{
+    return std::tuple_cat(std::make_tuple(elem_a), elem_b);
+}
+
+template <typename... As, typename B>
+inline std::tuple<As..., B> concatenateToTuple(std::tuple<As...> const &elem_a, B const &elem_b)
+{
+    return std::tuple_cat(elem_a, std::make_tuple(elem_b));
+}
+template <typename... As, typename... Bs>
+inline std::tuple<As..., Bs...> concatenateToTuple(std::tuple<As...> const &elem_a, std::tuple<Bs...> const &elem_b)
+{
+    return std::tuple_cat(elem_a, elem_b);
+}
 
 // Core classes
 
@@ -80,7 +109,6 @@ public:
     {
         return d_success;
     }
-    
 };
 
 template <typename Result>
@@ -99,98 +127,26 @@ public:
     }
 
     template <typename OtherResult>
-    Parser<std::tuple<Result, OtherResult>> sequence(Parser<OtherResult> const &parser_b) const
+    auto sequence(Parser<OtherResult> const &parser_b) const -> decltype(auto)
     {
+        typedef decltype(concatenateToTuple(std::declval<Result>(), std::declval<OtherResult>())) result_t;
         auto lambda = [&](std::string const &in)
         {
             ParseResult<Result> result_a = this->run(in);
             bool testA = result_a;
             if(!testA)
-                return ParseResult<std::tuple<Result, OtherResult>>{};
+                return ParseResult<result_t>{};
             ParseResult<OtherResult> result_b = parser_b.run(result_a.unparsed_rest());
             bool testB = result_b;
-            // std::cout << "Result B" << testB << '\n';
             if(!testB)
-                return ParseResult<std::tuple<Result, OtherResult>>{};
-            return ParseResult<std::tuple<Result, OtherResult>>{std::make_tuple(result_a.content(), result_b.content()), result_b.unparsed_rest()};
+                return ParseResult<result_t>{};
+            return ParseResult<result_t>{concatenateToTuple(result_a.content(), result_b.content()), result_b.unparsed_rest()};
         };
-        return Parser<std::tuple<Result, OtherResult>>{lambda};
+        return Parser<result_t>{lambda};
     }
-
-    // Specialization for tuples.
-    template <typename... OtherResults>
-    Parser<std::tuple<Result, OtherResults...>> sequence(Parser<std::tuple<OtherResults...>> const &parser_b) const
-        {
-            auto lambda = [&](std::string const &in)
-                {
-                    ParseResult<Result> result_a = this->run(in);
-                    bool testA = result_a;
-                    if(!testA)
-                        return ParseResult<std::tuple<Result, OtherResults...>>{};
-                    ParseResult<std::tuple<OtherResults...>> result_b = parser_b.run(result_a.unparsed_rest());
-                    bool testB = result_b;
-                    // std::cout << "Result B" << testB << '\n';
-                    if(!testB)
-                        return ParseResult<std::tuple<Result, OtherResults...>>{};
-                    return ParseResult<std::tuple<Result, OtherResults...>>{std::tuple_cat(std::make_tuple(result_a.content()), result_b.content()), result_b.unparsed_rest()};
-                };
-            return Parser<std::tuple<Result, OtherResults...>>{lambda};
-        }
-
-
-
 };
 
 
-
-// Specialization to sequence tuple results.
-template <typename... Results>
-class Parser<std::tuple<Results...>>
-{
-    typedef std::function<ParseResult<std::tuple<Results...>>(std::string const &)> ParseFunction;
-    ParseFunction d_fun;
-public:
-    Parser(ParseFunction fun)
-        :
-        d_fun(fun)
-    {};
-    ParseResult<std::tuple<Results...>> run(std::string const &in) const
-    {
-        return d_fun(in);
-    }
-    template <typename OtherResult>
-    Parser<std::tuple<Results..., OtherResult>> sequence(Parser<OtherResult> const &parser_b) const
-    {
-        auto lambda = [&](std::string const &in)
-        {
-            ParseResult<std::tuple<Results...>> result_a = this->run(in);
-            if(!result_a)
-                return ParseResult<std::tuple<Results..., OtherResult>>{};
-            ParseResult<OtherResult> result_b = parser_b.run(result_a.unparsed_rest());
-            if(!result_b)
-                return ParseResult<std::tuple<Results..., OtherResult>>{};
-            return ParseResult<std::tuple<Results..., OtherResult>>{std::tuple_cat(result_a.content(), std::make_tuple(result_b.content())), result_b.unparsed_rest()};
-        };
-        return Parser<std::tuple<Results..., OtherResult>>{lambda};
-    }
-
-    template <typename... OtherResults>
-        Parser<std::tuple<Results..., OtherResults...>> sequence(Parser<std::tuple<OtherResults...>> const &parser_b) const
-    {
-        auto lambda = [&](std::string const &in)
-            {
-                ParseResult<std::tuple<Results...>> result_a = this->run(in);
-                if(!result_a)
-                    return ParseResult<std::tuple<Results..., OtherResults...>>{};
-                ParseResult<std::tuple<OtherResults...>> result_b = parser_b.run(result_a.unparsed_rest());
-                if(!result_b)
-                    return ParseResult<std::tuple<Results..., OtherResults...>>{};
-                return ParseResult<std::tuple<Results..., OtherResults...>>{std::tuple_cat(result_a.content(), result_b.content()), result_b.unparsed_rest()};
-            };
-        return Parser<std::tuple<Results..., OtherResults...>>{lambda};
-    }
-
-};
 
 // Simple parsers
 
