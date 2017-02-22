@@ -76,10 +76,11 @@ public:
         return d_content;
     }
 
-    inline operator bool()
+    operator bool()
     {
         return d_success;
     }
+    
 };
 
 template <typename Result>
@@ -98,54 +99,58 @@ public:
     }
 
     template <typename OtherResult>
-    Parser<std::tuple<Result, OtherResult>> sequence(Parser<OtherResult> parser_b)
+    Parser<std::tuple<Result, OtherResult>> sequence(Parser<OtherResult> const &parser_b) const
     {
         auto lambda = [&](std::string const &in)
         {
             ParseResult<Result> result_a = this->run(in);
-            if(!result_a)
+            bool testA = result_a;
+            if(!testA)
                 return ParseResult<std::tuple<Result, OtherResult>>{};
             ParseResult<OtherResult> result_b = parser_b.run(result_a.unparsed_rest());
-            if(!result_b)
+            bool testB = result_b;
+            // std::cout << "Result B" << testB << '\n';
+            if(!testB)
                 return ParseResult<std::tuple<Result, OtherResult>>{};
             return ParseResult<std::tuple<Result, OtherResult>>{std::make_tuple(result_a.content(), result_b.content()), result_b.unparsed_rest()};
         };
         return Parser<std::tuple<Result, OtherResult>>{lambda};
     }
-
 };
 
+
+
 // Specialization to sequence tuple results.
-// template <typename... Results>
-// class Parser<std::tuple<Results...>>
-// {
-//     typedef std::function<ParseResult<std::tuple<Results...>>(std::string const &)> ParseFunction;
-//     ParseFunction d_fun;
-// public:
-//     Parser(ParseFunction fun)
-//         :
-//         d_fun(fun)
-//     {};
-//     ParseResult<std::tuple<Results...>> run(std::string const &in) const
-//     {
-//         return d_fun(in);
-//     }
-//     template <typename OtherResult>
-//     Parser<std::tuple<Results..., OtherResult>> sequence(Parser<OtherResult> parser_b)
-//     {
-//         auto lambda = [&](std::string const &in)
-//         {
-//             ParseResult<std::tuple<Results...>> result_a = this->run(in);
-//             if(!result_a)
-//                 return ParseResult<std::tuple<Results..., OtherResult>>{};
-//             ParseResult<OtherResult> result_b = parser_b.run(result_a.unparsed_rest());
-//             if(!result_b)
-//                 return ParseResult<std::tuple<Results..., OtherResult>>{};
-//             return ParseResult<std::tuple<Results..., OtherResult>>{std::tuple_cat(result_a.content(), std::make_tuple(result_b.content())), result_b.unparsed_rest()};
-//         };
-//         return Parser<std::tuple<Results..., OtherResult>>{lambda};
-//     }
-// };
+template <typename... Results>
+class Parser<std::tuple<Results...>>
+{
+    typedef std::function<ParseResult<std::tuple<Results...>>(std::string const &)> ParseFunction;
+    ParseFunction d_fun;
+public:
+    Parser(ParseFunction fun)
+        :
+        d_fun(fun)
+    {};
+    ParseResult<std::tuple<Results...>> run(std::string const &in) const
+    {
+        return d_fun(in);
+    }
+    template <typename OtherResult>
+    Parser<std::tuple<Results..., OtherResult>> sequence(Parser<OtherResult> const &parser_b) const
+    {
+        auto lambda = [&](std::string const &in)
+        {
+            ParseResult<std::tuple<Results...>> result_a = this->run(in);
+            if(!result_a)
+                return ParseResult<std::tuple<Results..., OtherResult>>{};
+            ParseResult<OtherResult> result_b = parser_b.run(result_a.unparsed_rest());
+            if(!result_b)
+                return ParseResult<std::tuple<Results..., OtherResult>>{};
+            return ParseResult<std::tuple<Results..., OtherResult>>{std::tuple_cat(result_a.content(), std::make_tuple(result_b.content())), result_b.unparsed_rest()};
+        };
+        return Parser<std::tuple<Results..., OtherResult>>{lambda};
+    }
+};
 
 // Simple parsers
 
@@ -224,7 +229,8 @@ int main()
     input.assign((std::istreambuf_iterator<char>(std::cin)),
                  std::istreambuf_iterator<char>());
 
-    auto digit_parser = digit() >> alpha() >> alpha();
+    // auto digit_parser = digit() >> alpha() >> alpha();
+    auto digit_parser = digit() >> digit() >> digit();
     auto parse_result = digit_parser.run(input);
     if(parse_result)
     {
