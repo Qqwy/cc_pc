@@ -73,7 +73,6 @@ inline std::tuple<As..., Bs...> concatenateToTuple(std::tuple<As...> const &elem
 }
 
 // Core classes
-
 template <typename Content>
 class ParseResult
 {
@@ -110,18 +109,22 @@ public:
         return d_success;
     }
 };
+template <typename Result>
+using ParseResults = std::vector<ParseResult<Result>>;
+
+
 
 template <typename Result>
 class Parser
 {
-    typedef std::function<ParseResult<Result>(std::string const &)> ParseFunction;
+    typedef std::function<ParseResults<Result>(std::string const &)> ParseFunction;
     ParseFunction d_fun;
 public:
     Parser(ParseFunction fun)
     :
         d_fun(fun)
     {};
-    ParseResult<Result> run(std::string const &in) const
+    ParseResults<Result> run(std::string const &in) const
     {
         return d_fun(in);
     }
@@ -132,15 +135,15 @@ public:
         typedef decltype(concatenateToTuple(std::declval<Result>(), std::declval<OtherResult>())) result_t;
         auto lambda = [&](std::string const &in)
         {
-            ParseResult<Result> result_a = this->run(in);
-            bool testA = result_a;
-            if(!testA)
-                return ParseResult<result_t>{};
-            ParseResult<OtherResult> result_b = parser_b.run(result_a.unparsed_rest());
-            bool testB = result_b;
-            if(!testB)
-                return ParseResult<result_t>{};
-            return ParseResult<result_t>{concatenateToTuple(result_a.content(), result_b.content()), result_b.unparsed_rest()};
+            ParseResults<result_t> results;
+            std::vector<ParseResult<Result>> a_results = this->run(in);
+            for(ParseResult<Result> result_a : a_results)
+            {
+                ParseResults<OtherResult> b_results = parser_b.run(result_a.unparsed_rest());
+                for(ParseResult<OtherResult> result_b : b_results)
+                    results.push_back(ParseResult<result_t>{concatenateToTuple(result_a.content(), result_b.content()), result_b.unparsed_rest()});
+            }
+            return results;
         };
         return Parser<result_t>{lambda};
     }
@@ -156,11 +159,11 @@ Parser<char> satisfies(Fun const &fun)
     auto lambda = [&](std::string const &in)
         {
             if(in.empty())
-                return ParseResult<char>{};
+                return ParseResults<char>{};
             char ch = in[0];
             if(!fun(ch))
-                return ParseResult<char>{};
-            return ParseResult<char>{ch, in.substr(1, in.size())};
+                return ParseResults<char>{};
+            return ParseResults<char>{ParseResult<char>{ch, in.substr(1, in.size())}};
         };
     return Parser<char>{lambda};
 }
@@ -199,7 +202,7 @@ std::ostream & operator<<(std::ostream &os, Parser<A> &parser_a)
     return os;
 }
 
-
+// TODO: Fix this.
 template <typename A>
 Parser<std::vector<A>> many(Parser<A> const &parser_a)
 {
@@ -227,12 +230,15 @@ int main()
 
     // auto digit_parser = digit() >> alpha() >> alpha();
     auto digit_parser = (digit() >> digit()) >> (digit() >> digit());
-    auto parse_result = digit_parser.run(input);
-    if(parse_result)
+    auto parse_results = digit_parser.run(input);
+    if(!parse_results.empty())
     {
+        for(auto parse_result : parse_results)
+        {
         std::cout << "Parse success!\n";
         std::cout << parse_result.content() << '\n';
         std::cout << "Rest of string: " << parse_result.unparsed_rest();
+        }
     }
     else
     {
