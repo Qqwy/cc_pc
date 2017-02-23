@@ -163,20 +163,20 @@ namespace Combi
         }
 
         template<typename Function>
-        auto transform(Function const &fun) const -> Parser<decltype(fun(std::declval<Result>()))>
+        auto operator[](Function const &fun) const -> Parser<decltype(fun(std::declval<Result>()))>
+        {
+            auto lambda = [&](std::string const &in)
             {
-                auto lambda = [&](std::string const &in)
+                ParseResults<Result> a_results = d_fun(in);
+                ParseResults<decltype(fun(std::declval<Result>()))> results;
+                for(ParseResult<Result> result_a : a_results)
                 {
-                    ParseResults<Result> a_results = d_fun(in);
-                    ParseResults<decltype(fun(std::declval<Result>()))> results;
-                    for(ParseResult<Result> result_a : a_results)
-                    {
-                        results.push_back(ParseResult<decltype(fun(std::declval<Result>()))>{fun(result_a.content()), result_a.unparsed_rest()});
-                    }
-                    return results;
-                };
-                return Parser<decltype(fun(std::declval<Result>()))>{lambda};
+                    results.push_back(ParseResult<decltype(fun(std::declval<Result>()))>{fun(result_a.content()), result_a.unparsed_rest()});
+                }
+                return results;
             };
+            return Parser<decltype(fun(std::declval<Result>()))>{lambda};
+        };
     };
 
 
@@ -225,7 +225,7 @@ namespace Combi
     static const Parser<char> digit = satisfies([](char ch){return ::isdigit(ch);});
     static const Parser<char> alpha = satisfies([](char ch){return ::isalpha(ch);});
     static const Parser<char> alnum = digit | alpha;
-    static const Parser<int>  digit2 = digit.transform([](char ch){ return ch - '0';});
+    static const Parser<int>  digit2 = digit[([](char ch){ return ch - '0';})];
 
     Parser<char> ischar(char the_char)
     {
