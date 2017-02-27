@@ -145,11 +145,12 @@ namespace Combi
         {
             typedef decltype(concatenateToTuple(std::declval<Result>(), std::declval<OtherResult>())) result_t;
             std::cout << this << " Running operator>> \n";
-            auto lambda = [this, parser_b](std::string const &in)
+            auto parser_a = *this;
+            auto lambda = [parser_a, parser_b](std::string const &in)
             {
-                std::cout << this << " Running operator>> lambda \n";
+                std::cout << &parser_a << " Running operator>> lambda \n";
                 ParseResults<result_t> results;
-                std::vector<ParseResult<Result>> a_results = this->run(in);
+                std::vector<ParseResult<Result>> a_results = parser_a.run(in);
                 for(ParseResult<Result> result_a : a_results)
                 {
                     ParseResults<OtherResult> b_results = parser_b.run(result_a.unparsed_rest());
@@ -166,10 +167,11 @@ namespace Combi
         {
 
             std::cout << this << " Running operator| \n";
-            auto lambda = [this, parser_b](std::string const &in)
+            auto parser_a = *this;
+            auto lambda = [parser_a, parser_b](std::string const &in)
             {
-                std::cout << this << " Running operator| lambda \n";
-                ParseResults<Result> a_results = this->run(in);
+                std::cout << &parser_a << " Running operator| lambda \n";
+                ParseResults<Result> a_results = parser_a.run(in);
                 ParseResults<Result> b_results = parser_b.run(in);
                 ParseResults<Result> results = a_results;
                 results.insert(results.end(), b_results.begin(), b_results.end());
@@ -184,10 +186,11 @@ namespace Combi
         auto transform(Function fun) const -> Parser<decltype(fun(std::declval<Result>()))>
         {
             std::cout << this << " Running transform \n";
-            auto lambda = [this, fun](std::string const &in)
+            auto parser_a = *this;
+            auto lambda = [parser_a, fun](std::string const &in)
             {
                 std::cout << "Running transform lambda\n";
-                ParseResults<Result> a_results = this->d_fun(in);
+                ParseResults<Result> a_results = parser_a.d_fun(in);
                 ParseResults<decltype(fun(std::declval<Result>()))> results;
                 for(ParseResult<Result> result_a : a_results)
                 {
@@ -305,9 +308,9 @@ namespace Combi
     //     return Parser<std::vector<A>>{lambda} | nothing<A>();
     // }
     template <typename A>
-    // Parser<std::vector<A>> many(Parser<A> const &parser_a)
+    Parser<std::vector<A>> many(Parser<A> const &parser_a)
 
-    Parser<std::tuple<A, std::vector<A>>> many(Parser<A> const &parser_a)
+    // Parser<std::tuple<A, std::vector<A>>> many(Parser<A> const &parser_a)
     {
         auto lambda = [parser_a](std::string const &in)
         {
@@ -317,14 +320,16 @@ namespace Combi
         auto transformation = [](std::tuple<A, std::vector<A>> foo)
         {
             std::cout << "Running many transformation lambda \n";
-            return std::get<1>(foo);
+            std::vector<A> vec = std::get<1>(foo);
+            vec.push_back(std::get<0>(foo));
+            return vec;
         };
-        Parser<std::vector<A>> foo{lambda};
-        std::cout << "foo: " &foo << '\n';
-        std::cout << "parser_a: " &parser_a << '\n';
-        Parser<std::tuple<A, std::vector<A>>> result = parser_a >> foo;
-        std::cout << "result: " &result << '\n';
-        return (result);//.transform(transformation); // | nothing<A>();
+        // Parser<std::vector<A>> foo{lambda};
+        // std::cout << "foo: " &foo << '\n';
+        // std::cout << "parser_a: " &parser_a << '\n';
+        // Parser<std::tuple<A, std::vector<A>>> result = parser_a >> foo;
+        // std::cout << "result: " &result << '\n';
+        return (parser_a >> Parser<std::vector<A>>{lambda}).transform(transformation) | nothing<A>();
     }
 }
 
@@ -344,10 +349,11 @@ int main()
                  std::istreambuf_iterator<char>());
 
     // auto digit_parser = digit >> alpha >> alpha;
-    auto digit_parser = myParser();
+    // auto digit_parser = myParser();
     // auto digit_parser = (digit | alpha) >> digit2 >> digit2;//(digit() >> digit()) >> (digit() >> digit());
-    // auto digit_parser = nothing<char>();
+    auto digit_parser = many(digit);
     // auto digit_parser = digit >> digit >> digit >> digit >> digit;
+    std::cout << "TEST\n";
     auto parse_results = digit_parser.run(input);
     if(!parse_results.empty())
     {
