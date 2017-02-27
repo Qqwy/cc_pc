@@ -6,6 +6,7 @@
 #include <functional>
 #include <experimental/optional>
 #include <type_traits>
+#include <future>
 
 namespace Combi
 {
@@ -145,7 +146,7 @@ namespace Combi
         }
     };
     template <typename Result>
-    using ParseResults = std::vector<ParseResult<Result>>;
+    using ParseResults = std::future<std::vector<ParseResult<Result>>>;
 
     template <typename Result>
     class Parser
@@ -160,7 +161,10 @@ namespace Combi
         };
         ParseResults<Result> run(std::string const &in) const
         {
-            return d_fun(in);
+            auto parser_a = *this;
+            auto res = std::async(std::launch::deferred, [parser_a, in](){ return parser_a.d_fun(in); });
+// return d_fun(in);
+            return res;
         }
 
 
@@ -173,15 +177,21 @@ namespace Combi
             auto parser_a = *this;
             auto lambda = [parser_a, parser_b](std::string const &in)
             {
-                ParseResults<result_t> results;
-                std::vector<ParseResult<Result>> a_results = parser_a.run(in);
-                for(ParseResult<Result> result_a : a_results)
+                std::vector<ParseResult<result_t>> results;
+                ParseResults<Result> a_results = parser_a.run(in);
+                for(ParseResult<Result> result_a : a_results.get())
                 {
                     ParseResults<OtherResult> b_results = parser_b.run(result_a.unparsed_rest());
-                    for(ParseResult<OtherResult> result_b : b_results)
-                        results.push_back(ParseResult<result_t>{concatenateToTuple(result_a.content(), result_b.content()), result_b.unparsed_rest()});
+                    for(ParseResult<OtherResult> result_b : b_results.get())
+                    {
+                        auto lam = [result_a, result_b]() {return ParseResult<result_t>{concatenateToTuple(result_a.content(), result_b.content()), result_b.unparsed_rest()}; };
+                        // results.push_back(std::async(std::launch::deferred, lam));
+                        results.push_back(lam());
+                    }
+
+                        // results.push_back(ParseResult<result_t>{concatenateToTuple(result_a.content(), result_b.content()), result_b.unparsed_rest()});
                 }
-                return results;
+                return std::async(std::launch::deferred, [results](){ return results; });
             };
             return Parser<result_t>{lambda};
         }
