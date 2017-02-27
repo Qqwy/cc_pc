@@ -145,7 +145,7 @@ namespace Combi
         {
             typedef decltype(concatenateToTuple(std::declval<Result>(), std::declval<OtherResult>())) result_t;
             std::cout << this << " Running operator>> \n";
-            auto lambda = [=](std::string const &in)
+            auto lambda = [this, parser_b](std::string const &in)
             {
                 std::cout << this << " Running operator>> lambda \n";
                 ParseResults<result_t> results;
@@ -166,7 +166,7 @@ namespace Combi
         {
 
             std::cout << this << " Running operator| \n";
-            auto lambda = [=](std::string const &in)
+            auto lambda = [this, parser_b](std::string const &in)
             {
                 std::cout << this << " Running operator| lambda \n";
                 ParseResults<Result> a_results = this->run(in);
@@ -184,10 +184,10 @@ namespace Combi
         auto transform(Function fun) const -> Parser<decltype(fun(std::declval<Result>()))>
         {
             std::cout << this << " Running transform \n";
-            auto lambda = [=](std::string const &in)
+            auto lambda = [this, fun](std::string const &in)
             {
                 std::cout << "Running transform lambda\n";
-                ParseResults<Result> a_results = d_fun(in);
+                ParseResults<Result> a_results = this->d_fun(in);
                 ParseResults<decltype(fun(std::declval<Result>()))> results;
                 for(ParseResult<Result> result_a : a_results)
                 {
@@ -229,7 +229,7 @@ namespace Combi
     template <typename Fun>
     Parser<char> satisfies(Fun const &fun)
     {
-        auto lambda = [&](std::string const &in)
+        auto lambda = [fun](std::string const &in)
             {
                 if(in.empty())
                     return ParseResults<char>{};
@@ -249,7 +249,7 @@ namespace Combi
 
     Parser<char> ischar(char the_char)
     {
-        return satisfies([&](char real_char){return the_char == real_char;});
+        return satisfies([the_char](char real_char){return the_char == real_char;});
     }
     // static const Parser<std::vector<char>> digits = many(digit);
 
@@ -257,7 +257,7 @@ namespace Combi
     Parser<TAnything> unit(TAnything const &value)
     {
         std::cout << "Running unit \n";
-        auto lambda = [&](std::string const &in){
+        auto lambda = [value](std::string const &in){
             std::cout << "Running unit lambda \n";
             return ParseResults<TAnything>{ParseResult<TAnything>{value, in}};
         };
@@ -274,7 +274,7 @@ namespace Combi
     template <typename A>
     Parser<std::tuple<>> skip(Parser<A> const &parser_a)
     {
-        auto transformation = [&](A const & _value)
+        auto transformation = [parser_a](A const & _value)
         {
             return std::tuple<>{};
         };
@@ -305,28 +305,33 @@ namespace Combi
     //     return Parser<std::vector<A>>{lambda} | nothing<A>();
     // }
     template <typename A>
-    Parser<std::vector<A>> many(Parser<A> const &parser_a)
+    // Parser<std::vector<A>> many(Parser<A> const &parser_a)
+
+    Parser<std::tuple<A, std::vector<A>>> many(Parser<A> const &parser_a)
     {
-        auto lambda = [=](std::string const &in)
+        auto lambda = [parser_a](std::string const &in)
         {
             std::cout << "Running recursively!\n";
             return many(parser_a).run(in);
         };
-        auto transformation = [=](std::tuple<A, std::vector<A>> foo)
+        auto transformation = [](std::tuple<A, std::vector<A>> foo)
         {
-
             std::cout << "Running many transformation lambda \n";
             return std::get<1>(foo);
         };
         Parser<std::vector<A>> foo{lambda};
-        return (parser_a >> foo).transform(transformation); // | nothing<A>();
+        std::cout << "foo: " &foo << '\n';
+        std::cout << "parser_a: " &parser_a << '\n';
+        Parser<std::tuple<A, std::vector<A>>> result = parser_a >> foo;
+        std::cout << "result: " &result << '\n';
+        return (result);//.transform(transformation); // | nothing<A>();
     }
 }
 
 Combi::Parser<std::tuple<char, char, char>> myParser()
 {
     using namespace Combi;
-    return digit >> alpha >> alpha;
+    return digit >> alpha >> alpha; 
 }
 
 int main()
