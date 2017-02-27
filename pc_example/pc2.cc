@@ -391,6 +391,13 @@ namespace Combi
         return parser_a.transform(transformation) | nothing<A>();
     }
 
+    template <typename A>
+    Parser<std::deque<A>> maybe(Parser<std::deque<A>> parser_a)
+    {
+        return parser_a | nothing<A>();
+    }
+
+
     // Runs parser A, but returns an empty tuple
     // (which is discarded when sequenced together with other parsers)
     template <typename A>
@@ -455,7 +462,7 @@ namespace Combi
         Parser<std::deque<char>> float_exponent = ((ch('e') | ch('E')).transform(singletonDeque<char>) >> maybe(ch('+') | ch('-')) >> digits).transform(float_exponent_transformation);
     }
     static const Parser<std::deque<char>> float_str =
-              (integer_str >> ch('.').transform(singletonDeque<char>) >> digits >> float_exponent).transform(float_str_transformation);
+              (integer_str >> ch('.').transform(singletonDeque<char>) >> digits >> maybe(float_exponent)).transform(float_str_transformation);
 
     // static const Parser<std::deque<char>> float_str = (integer_str >> ch('.') >> digits).transform(&combineTuple<char>);
 
