@@ -184,7 +184,7 @@ namespace Combi
         auto transform(Function fun) const -> Parser<decltype(fun(std::declval<Result>()))>
         {
             std::cout << this << " Running transform \n";
-            auto lambda = [&](std::string const &in)
+            auto lambda = [=](std::string const &in)
             {
                 std::cout << "Running transform lambda\n";
                 ParseResults<Result> a_results = d_fun(in);
@@ -307,12 +307,12 @@ namespace Combi
     template <typename A>
     Parser<std::vector<A>> many(Parser<A> const &parser_a)
     {
-        auto lambda = [&](std::string const &in)
+        auto lambda = [=](std::string const &in)
         {
             std::cout << "Running recursively!\n";
             return many(parser_a).run(in);
         };
-        auto transformation = [&](std::tuple<A, std::vector<A>> foo)
+        auto transformation = [=](std::tuple<A, std::vector<A>> foo)
         {
 
             std::cout << "Running many transformation lambda \n";
