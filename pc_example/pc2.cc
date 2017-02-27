@@ -1,3 +1,4 @@
+#include <deque>
 #include <vector>
 #include <iostream>
 #include <iterator>
@@ -40,6 +41,16 @@ namespace Combi
     {
         os << "std::vector{";
         std::copy(vector.begin(), vector.end(), std::ostream_iterator<A>(os));
+        os << "}";
+        return os;
+    }
+
+    // Pretty printing for deques.
+    template <typename A>
+    std::ostream &operator<< (std::ostream& os, std::deque<A> const &deque)
+    {
+        os << "std::deque{";
+        std::copy(deque.begin(), deque.end(), std::ostream_iterator<A>(os));
         os << "}";
         return os;
     }
@@ -268,10 +279,10 @@ namespace Combi
     }
 
     template <typename A>
-    Parser<std::vector<A>> nothing()
+    Parser<std::deque<A>> nothing()
     {
         std::cout << "Running nothing \n";
-        return unit(std::vector<A>{});
+        return unit(std::deque<A>{});
     };
 
     template <typename A>
@@ -308,7 +319,7 @@ namespace Combi
     //     return Parser<std::vector<A>>{lambda} | nothing<A>();
     // }
     template <typename A>
-    Parser<std::vector<A>> many(Parser<A> const &parser_a)
+    Parser<std::deque<A>> many(Parser<A> const &parser_a)
 
     // Parser<std::tuple<A, std::vector<A>>> many(Parser<A> const &parser_a)
     {
@@ -317,26 +328,26 @@ namespace Combi
             std::cout << "Running recursively!\n";
             return many(parser_a).run(in);
         };
-        auto transformation = [](std::tuple<A, std::vector<A>> foo)
+        auto transformation = [](std::tuple<A, std::deque<A>> foo)
         {
             std::cout << "Running many transformation lambda \n";
-            std::vector<A> vec = std::get<1>(foo);
-            vec.push_back(std::get<0>(foo));
+            std::deque<A> vec = std::get<1>(foo);
+            vec.push_front(std::get<0>(foo));
             return vec;
         };
         // Parser<std::vector<A>> foo{lambda};
         // std::cout << "foo: " &foo << '\n';
         // std::cout << "parser_a: " &parser_a << '\n';
-        // Parser<std::tuple<A, std::vector<A>>> result = parser_a >> foo;
+        // Parser<std::tuple<A, std::deque<A>>> result = parser_a >> foo;
         // std::cout << "result: " &result << '\n';
-        return (parser_a >> Parser<std::vector<A>>{lambda}).transform(transformation) | nothing<A>();
+        return (parser_a >> Parser<std::deque<A>>{lambda}).transform(transformation) | nothing<A>();
     }
 }
 
 Combi::Parser<std::tuple<char, char, char>> myParser()
 {
     using namespace Combi;
-    return digit >> alpha >> alpha; 
+    return digit >> alpha >> alpha;
 }
 
 int main()
