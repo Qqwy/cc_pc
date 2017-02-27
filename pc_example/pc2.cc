@@ -429,16 +429,19 @@ namespace Combi
         return parser_a >> skip(whitespaces);
     }
 
-    Parser<std::deque<char>> integer_str()
-    {
-        auto transformation = [](std::tuple<std::deque<char>, std::deque<char>> const &tuple)
+    namespace {
+        auto integer_str_transformation = [](std::tuple<std::deque<char>, std::deque<char>> const &tuple)
         {
             return combineDequeTuple(tuple);
         };
-        return (maybe(ch('-')) >> digits).transform(transformation);
     }
 
-    // static const Parser<std::vector<std::deque<char>>> integer_str = (maybe(ch('-')) >> digits).transform();
+    // Parser<std::deque<char>> integer_str()
+    // {
+        // return (maybe(ch('-')) >> digits).transform(transformation);
+    // }
+
+    static const Parser<std::deque<char>> integer_str = (maybe(ch('-')) >> digits).transform(integer_str_transformation);
 
     // static const Parser<std::deque<char>> float_str = (integer_str >> ch('.') >> digits).transform(&combineTuple<char>);
 
@@ -466,7 +469,7 @@ int main()
     // auto parser = myParser();
     // auto parser = (digit | alpha) >> digit2 >> digit2;//(digit() >> digit()) >> (digit() >> digit());
     // auto parser = many(digit);
-    auto parser = integer_str();
+    auto parser = integer_str;
     // auto parser = integer_str;
     // auto parser = string("foo") >> digits;
     // auto digit_parser = digit >> digit >> digit >> digit >> digit;
