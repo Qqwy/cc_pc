@@ -9,8 +9,6 @@
 
 namespace Combi
 {
-
-
     // Pretty printing for tuples.
     template<size_t N>
     struct print_tuple{
@@ -159,31 +157,22 @@ namespace Combi
         :
             d_fun(fun)
         {
-            std::cout << "Parser " << this << " was created!\n";
         };
         ParseResults<Result> run(std::string const &in) const
         {
             return d_fun(in);
         }
 
-        ~Parser()
-        {
-            std::cout << "Parser " << this << " is getting destroyed!\n";
-        }
-
 
 
         // Simple combinators:
-
         template <typename OtherResult>
         auto operator>>(Parser<OtherResult> const &parser_b) const -> decltype(auto)
         {
             typedef decltype(concatenateToTuple(std::declval<Result>(), std::declval<OtherResult>())) result_t;
-            std::cout << this << " Running operator>> \n";
             auto parser_a = *this;
             auto lambda = [parser_a, parser_b](std::string const &in)
             {
-                std::cout << &parser_a << " Running operator>> lambda \n";
                 ParseResults<result_t> results;
                 std::vector<ParseResult<Result>> a_results = parser_a.run(in);
                 for(ParseResult<Result> result_a : a_results)
@@ -201,11 +190,9 @@ namespace Combi
         Parser<Result> operator|(Parser<Result> const &parser_b) const
         {
 
-            std::cout << this << " Running operator| \n";
             auto parser_a = *this;
             auto lambda = [parser_a, parser_b](std::string const &in)
             {
-                std::cout << &parser_a << " Running operator| lambda \n";
                 ParseResults<Result> a_results = parser_a.run(in);
                 ParseResults<Result> b_results = parser_b.run(in);
                 ParseResults<Result> results = a_results;
@@ -218,11 +205,9 @@ namespace Combi
         template<typename Function>
         auto transform(Function fun) const -> Parser<decltype(fun(std::declval<Result>()))>
         {
-            std::cout << this << " Running transform \n";
             auto parser_a = *this;
             auto lambda = [parser_a, fun](std::string const &in)
             {
-                std::cout << "Running transform lambda\n";
                 ParseResults<Result> a_results = parser_a.d_fun(in);
                 ParseResults<decltype(fun(std::declval<Result>()))> results;
                 for(ParseResult<Result> result_a : a_results)
@@ -235,33 +220,20 @@ namespace Combi
         };
     };
 
-
-    // More Combinators
-
-    // TODO: Fix this.
-    // template <typename A>
-    // Parser<std::vector<A>> many(Parser<A> const &parser_a)
-    // {
-    //     auto lam = [&](std::string in)
-    //     {
-    //         std::vector<A> vec{};
-    //         while (true)
-    //         {
-    //             auto parse_result = parser_a.run(in);
-    //             if(!parse_result)
-    //                 break;
-    //             vec.push_back(parse_result.content());
-    //             in = parse_result.unparsed_rest();
-    //         }
-    //         return ParseResult<std::vector<A>>{vec, in};
-    //     };
-    //     return Parser<std::vector<A>>{lam};
-    // }
-
-
+    // Helper functions we do not want to export
+    namespace {
+        template <typename A>
+        std::deque<A> combineTupleToDeque(std::tuple<A, std::deque<A>> tuple)
+        {
+            std::deque<A> vec = std::get<1>(tuple);
+            vec.push_front(std::get<0>(tuple));
+            return vec;
+        }
+    }
 
     // Simple parsers
 
+    // Returns matched character if given predicate function returns true.
     template <typename Fun>
     Parser<char> satisfies(Fun const &fun)
     {
@@ -277,97 +249,70 @@ namespace Combi
         return Parser<char>{lambda};
     }
 
-    Parser<char> ischar(char the_char)
+
+    // Matches if input starts with given character.
+    Parser<char> ch(char the_char)
     {
         return satisfies([the_char](char real_char){return the_char == real_char;});
     }
-    // static const Parser<std::vector<char>> digits = many(digit);
 
+    // Matches if input starts with given string.
+    Parser<std::string> string(std::string const &str)
+    {
+        auto lambda = [str](std::string const &in)
+        {
+            std::cout << "Checks if " << str << " is part of " << in << "\n";
+            if(in.find(str) == 0)
+                return ParseResults<std::string>{ParseResult<std::string>{str, in.substr(str.size(), in.size())}};
+            return ParseResults<std::string>{};
+        };
+        return Parser<std::string>{lambda};
+    }
+
+    // Does not consume input, returns given value.
     template <typename TAnything>
     Parser<TAnything> unit(TAnything const &value)
     {
-        std::cout << "Running unit \n";
         auto lambda = [value](std::string const &in){
-            std::cout << "Running unit lambda \n";
             return ParseResults<TAnything>{ParseResult<TAnything>{value, in}};
         };
         return Parser<TAnything>{lambda};
     }
 
+    // Returns an empty deque.
     template <typename A>
     Parser<std::deque<A>> nothing()
     {
-        std::cout << "Running nothing \n";
         return unit(std::deque<A>{});
     };
 
+    // Runs parser A, but returns an empty tuple
+    // (which is discarded when sequenced together with other parsers)
     template <typename A>
     Parser<std::tuple<>> skip(Parser<A> const &parser_a)
     {
-        auto transformation = [parser_a](A const & _value)
+        auto transformation = [parser_a](A const &)
         {
             return std::tuple<>{};
         };
         return parser_a.transform(transformation);
     }
 
-    // template <typename A>
-    // Parser<std::vector<A>> many(Parser<A> const &parser_a)
-    // {
-    //     auto lambda = [&](std::string const &in)
-    //         {
-    //             // ParseResults<A> results = parser_a.parse(in);
-    //             ParseResults<std::tuple<A, std::vector<A>>> temp_results = (parser_a >> many(parser_a)).run(in);
-    //             ParseResults<std::vector<A>> real_results;
-    //             for(ParseResult<std::tuple<A, std::vector<A>>> result : temp_results)
-    //             {
-    //                 std::vector<A> result_vec;
-    //                 A first_elem = std::get<0>(result.content());
-    //                 std::cout << "FIRST ELEM: " << first_elem << '\n';
-    //                 std::vector<A> rest_elems = std::get<1>(result.content());
-    //                 std::cout << "REST: " << rest_elems << '\n';
-    //                 result_vec.push_back(first_elem);
-    //                 result_vec.insert(result_vec.end(), rest_elems.begin(), rest_elems.end());
-    //                 real_results.push_back(ParseResult<std::vector<A>>(result_vec, result.unparsed_rest()));
-    //             }
-    //             return ParseResults<std::vector<A>>{real_results};
-    //         };
-    //     return Parser<std::vector<A>>{lambda} | nothing<A>();
-    // }
-
-    namespace {
-        template <typename A>
-        std::deque<A> combineTupleToDeq(std::tuple<A, std::deque<A>> tuple)
-        {
-            std::deque<A> vec = std::get<1>(tuple);
-            vec.push_front(std::get<0>(tuple));
-            return vec;
-        }
-    }
-
+    // Returns all results of running `parser_a` zero or more times.
     template <typename A>
     Parser<std::deque<A>> many(Parser<A> const &parser_a)
-
-    // Parser<std::tuple<A, std::vector<A>>> many(Parser<A> const &parser_a)
     {
         auto lambda = [parser_a](std::string const &in)
         {
-            std::cout << "Running recursively!\n";
             return many(parser_a).run(in);
         };
-        auto transformation = [](std::tuple<A, std::deque<A>> foo)
-        {
-            std::cout << "Running many transformation lambda \n";
-            std::deque<A> vec = std::get<1>(foo);
-            vec.push_front(std::get<0>(foo));
-            return vec;
-        };
-        // Parser<std::vector<A>> foo{lambda};
-        // std::cout << "foo: " &foo << '\n';
-        // std::cout << "parser_a: " &parser_a << '\n';
-        // Parser<std::tuple<A, std::deque<A>>> result = parser_a >> foo;
-        // std::cout << "result: " &result << '\n';
-        return (parser_a >> Parser<std::deque<A>>{lambda}).transform(&combineTupleToDeq<A>) | nothing<A>();
+       return (parser_a >> Parser<std::deque<A>>{lambda}).transform(&combineTupleToDeque<A>) | nothing<A>();
+    }
+
+    template <typename A>
+    Parser<std::deque<A>> many1(Parser<A> const &parser_a)
+    {
+        return (parser_a >> many(parser_a)).transform(&combineTupleToDeque<A>);
     }
 
     static const Parser<char> space = satisfies([](char ch){return ch == ' ';});
@@ -377,7 +322,7 @@ namespace Combi
     static const Parser<char> alpha = satisfies([](char ch){return ::isalpha(ch);});
     static const Parser<char> alnum = digit | alpha;
     static const Parser<int>  digit2 = digit.transform([](char ch){ return ch - '0';});
-    static const Parser<std::deque<char>> digits = many(digit);
+    static const Parser<std::deque<char>> digits = many1(digit);
 
     template <typename A>
     Parser<A> lexeme(Parser<A> const &parser_a)
@@ -386,15 +331,6 @@ namespace Combi
     }
 
     static const Parser<std::deque<char>> integer_str = lexeme(digits);
-    // static const Parser<std::deque<std::deque<char>>> args = (digits >> many(skip(ischar(',')) >> digits)).transform(&combineTupleToDeq<char>);
-    // static const Parser<std::tuple<std::deque<char>, std::deque<std::deque<char>>>> args = digits >> many(skip(ischar(',')) >> digits);
-    // static const Parser<std::deque<std::deque<char>>> args = digits >> (many(ischar(',') >> digits).transform([](std::tuple<char, std::deque<char>> foo)
-    // {
-    //     std::deque<char> deq = std::get<1>(foo);
-    //     deq.push_frond(std::get<0>(foo));
-    //     return deq;
-    // });
-
 }
 
 Combi::Parser<std::tuple<char, char, char>> myParser()
@@ -412,14 +348,15 @@ int main()
     input.assign((std::istreambuf_iterator<char>(std::cin)),
                  std::istreambuf_iterator<char>());
 
-    // auto digit_parser = digit >> alpha >> alpha;
-    // auto digit_parser = myParser();
-    // auto digit_parser = (digit | alpha) >> digit2 >> digit2;//(digit() >> digit()) >> (digit() >> digit());
-    // auto digit_parser = many(digit);
-    auto digit_parser = integer_str;
+    // auto parser = digit >> alpha >> alpha;
+    // auto parser = myParser();
+    // auto parser = (digit | alpha) >> digit2 >> digit2;//(digit() >> digit()) >> (digit() >> digit());
+    // auto parser = many(digit);
+    // auto parser = integer_str;
+    auto parser = string("foo") >> digits;
     // auto digit_parser = digit >> digit >> digit >> digit >> digit;
     std::cout << "TEST\n";
-    auto parse_results = digit_parser.run(input);
+    auto parse_results = parser.run(input);
     if(!parse_results.empty())
     {
         for(auto parse_result : parse_results)
