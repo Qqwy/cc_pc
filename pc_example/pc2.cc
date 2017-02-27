@@ -134,8 +134,10 @@ namespace Combi
         auto operator>>(Parser<OtherResult> const &parser_b) const -> decltype(auto)
         {
             typedef decltype(concatenateToTuple(std::declval<Result>(), std::declval<OtherResult>())) result_t;
-            auto lambda = [&](std::string const &in)
+            std::cout << "Running operator>> \n";
+            auto lambda = [=](std::string const &in)
             {
+                std::cout << "Running operator>> lambda \n";
                 ParseResults<result_t> results;
                 std::vector<ParseResult<Result>> a_results = this->run(in);
                 for(ParseResult<Result> result_a : a_results)
@@ -149,10 +151,14 @@ namespace Combi
             return Parser<result_t>{lambda};
         }
 
+
         Parser<Result> operator|(Parser<Result> const &parser_b) const
         {
-            auto lambda = [&](std::string const &in)
+
+            std::cout << "Running operator| \n";
+            auto lambda = [=](std::string const &in)
             {
+                std::cout << "Running operator| lambda \n";
                 ParseResults<Result> a_results = this->run(in);
                 ParseResults<Result> b_results = parser_b.run(in);
                 ParseResults<Result> results = a_results;
@@ -162,11 +168,15 @@ namespace Combi
             return Parser<Result>{lambda};
         }
 
+
+
         template<typename Function>
-        auto transform(Function const &fun) const -> Parser<decltype(fun(std::declval<Result>()))>
+        auto transform(Function fun) const -> Parser<decltype(fun(std::declval<Result>()))>
         {
+            std::cout << "Running transform \n";
             auto lambda = [&](std::string const &in)
             {
+                std::cout << "Running transform lambda\n";
                 ParseResults<Result> a_results = d_fun(in);
                 ParseResults<decltype(fun(std::declval<Result>()))> results;
                 for(ParseResult<Result> result_a : a_results)
@@ -224,7 +234,7 @@ namespace Combi
     static const Parser<char> space = satisfies([](char ch){return ch == ' ';});
     static const Parser<char> digit = satisfies([](char ch){return ::isdigit(ch);});
     static const Parser<char> alpha = satisfies([](char ch){return ::isalpha(ch);});
-    static const Parser<char> alnum = digit | alpha;
+    // static const Parser<char> alnum = digit | alpha;
     static const Parser<int>  digit2 = digit.transform([](char ch){ return ch - '0';});
 
     Parser<char> ischar(char the_char)
@@ -236,7 +246,9 @@ namespace Combi
     template <typename TAnything>
     Parser<TAnything> unit(TAnything const &value)
     {
-        auto lambda = [&](std::string const &in){
+        std::cout << "Running unit \n";
+        auto lambda = [=](std::string const &in){
+            std::cout << "Running unit lambda \n";
             return ParseResults<TAnything>{ParseResult<TAnything>{value, in}};
         };
         return Parser<TAnything>{lambda};
@@ -245,6 +257,7 @@ namespace Combi
     template <typename A>
     Parser<std::vector<A>> nothing()
     {
+        std::cout << "Running nothing \n";
         return unit(std::vector<A>{});
     };
 
@@ -291,23 +304,34 @@ namespace Combi
         };
         auto transformation = [&](std::tuple<A, std::vector<A>> foo)
         {
+
+            std::cout << "Running many transformation lambda \n";
             return std::get<1>(foo);
         };
-        return (parser_a >> Parser<std::vector<A>>{lambda}).transform(transformation) | nothing<A>();
+        Parser<std::vector<A>> foo{lambda};
+        return (parser_a >> foo).transform(transformation); // | nothing<A>();
     }
+}
+
+Combi::Parser<std::tuple<char, char, char>> myParser()
+{
+    using namespace Combi;
+    return digit >> alpha >> alpha;
 }
 
 int main()
 {
+
+    using namespace Combi;
+    // auto digit_parser = many(digit);
     std::string input;
     input.assign((std::istreambuf_iterator<char>(std::cin)),
                  std::istreambuf_iterator<char>());
-    using namespace Combi;
 
-    // auto digit_parser = digit() >> alpha() >> alpha();
+    // auto digit_parser = digit >> alpha >> alpha;
+    auto digit_parser = myParser();
     // auto digit_parser = (digit | alpha) >> digit2 >> digit2;//(digit() >> digit()) >> (digit() >> digit());
-    auto digit_parser = nothing<char>();
-    // auto digit_parser = many(digit);
+    // auto digit_parser = nothing<char>();
     // auto digit_parser = digit >> digit >> digit >> digit >> digit;
     auto parse_results = digit_parser.run(input);
     if(!parse_results.empty())
