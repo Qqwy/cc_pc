@@ -316,6 +316,12 @@ namespace Combi
             std::deque<std::deque<A>> nested_deque = tupleToDeque(tuple);
             return flatten(nested_deque);
         }
+
+        template <typename A>
+        std::deque<A> singletonDeque(A const & elem)
+        {
+            return std::deque<A>{elem};
+        }
     }
 
     // Simple parsers
@@ -435,13 +441,21 @@ namespace Combi
             return combineDequeTuple(tuple);
         };
     }
-
-    // Parser<std::deque<char>> integer_str()
-    // {
-        // return (maybe(ch('-')) >> digits).transform(transformation);
-    // }
-
     static const Parser<std::deque<char>> integer_str = (maybe(ch('-')) >> digits).transform(integer_str_transformation);
+    namespace {
+        auto float_str_transformation = [](std::tuple<std::deque<char>, std::deque<char>, std::deque<char>, std::deque<char>> const &tuple)
+        {
+            return combineDequeTuple(tuple);
+        };
+
+        auto float_exponent_transformation = [](std::tuple<std::deque<char>, std::deque<char>, std::deque<char>> const & tuple)
+        {
+            return combineDequeTuple(tuple);
+        };
+        Parser<std::deque<char>> float_exponent = ((ch('e') | ch('E')).transform(singletonDeque<char>) >> maybe(ch('+') | ch('-')) >> digits).transform(float_exponent_transformation);
+    }
+    static const Parser<std::deque<char>> float_str =
+              (integer_str >> ch('.').transform(singletonDeque<char>) >> digits >> float_exponent).transform(float_str_transformation);
 
     // static const Parser<std::deque<char>> float_str = (integer_str >> ch('.') >> digits).transform(&combineTuple<char>);
 
@@ -469,7 +483,7 @@ int main()
     // auto parser = myParser();
     // auto parser = (digit | alpha) >> digit2 >> digit2;//(digit() >> digit()) >> (digit() >> digit());
     // auto parser = many(digit);
-    auto parser = integer_str;
+    auto parser = float_str;
     // auto parser = integer_str;
     // auto parser = string("foo") >> digits;
     // auto digit_parser = digit >> digit >> digit >> digit >> digit;
