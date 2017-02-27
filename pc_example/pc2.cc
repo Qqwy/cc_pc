@@ -149,8 +149,6 @@ namespace Combi
     template <typename Result>
     using ParseResults = std::vector<ParseResult<Result>>;
 
-
-
     template <typename Result>
     class Parser
     {
@@ -216,8 +214,6 @@ namespace Combi
             };
             return Parser<Result>{lambda};
         }
-
-
 
         template<typename Function>
         auto transform(Function fun) const -> Parser<decltype(fun(std::declval<Result>()))>
