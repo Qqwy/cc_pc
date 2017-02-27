@@ -82,6 +82,32 @@ namespace Combi
         return std::tuple_cat(elem_a, elem_b);
     }
 
+    template <typename A>
+    inline A concatenateToTuple(A const &elem_a, std::tuple<> const &)
+    {
+        return elem_a;
+    }
+    
+    template <typename B>
+    inline B concatenateToTuple(std::tuple<> const &, B const &elem_b)
+    {
+        return elem_b;
+    }
+
+
+    template <typename... As>
+    inline std::tuple<As...> concatenateToTuple(std::tuple<As...> const &elem_a, std::tuple<> const &_elem_b)
+    {
+        return elem_a;
+    }
+    
+    template <typename... Bs>
+    inline std::tuple<Bs...> concatenateToTuple(std::tuple<> const &_elem_a, std::tuple<Bs...> const &elem_b)
+    {
+        return elem_b;
+    }
+
+
     // Core classes
     template <typename Content>
     class ParseResult
@@ -255,12 +281,6 @@ namespace Combi
         return Parser<char>{lambda};
     }
 
-    static const Parser<char> space = satisfies([](char ch){return ch == ' ';});
-    static const Parser<char> digit = satisfies([](char ch){return ::isdigit(ch);});
-    static const Parser<char> alpha = satisfies([](char ch){return ::isalpha(ch);});
-    // static const Parser<char> alnum = digit | alpha;
-    static const Parser<int>  digit2 = digit.transform([](char ch){ return ch - '0';});
-
     Parser<char> ischar(char the_char)
     {
         return satisfies([the_char](char real_char){return the_char == real_char;});
@@ -318,6 +338,17 @@ namespace Combi
     //         };
     //     return Parser<std::vector<A>>{lambda} | nothing<A>();
     // }
+
+    namespace {
+        template <typename A>
+        std::deque<A> combineTupleToDeq(std::tuple<A, std::deque<A>> tuple)
+        {
+            std::deque<A> vec = std::get<1>(tuple);
+            vec.push_front(std::get<0>(tuple));
+            return vec;
+        }
+    }
+
     template <typename A>
     Parser<std::deque<A>> many(Parser<A> const &parser_a)
 
@@ -340,8 +371,34 @@ namespace Combi
         // std::cout << "parser_a: " &parser_a << '\n';
         // Parser<std::tuple<A, std::deque<A>>> result = parser_a >> foo;
         // std::cout << "result: " &result << '\n';
-        return (parser_a >> Parser<std::deque<A>>{lambda}).transform(transformation) | nothing<A>();
+        return (parser_a >> Parser<std::deque<A>>{lambda}).transform(&combineTupleToDeq<A>) | nothing<A>();
     }
+
+    static const Parser<char> space = satisfies([](char ch){return ch == ' ';});
+    static const Parser<char> whitespace = satisfies([](char ch){return ::isblank(ch);});
+    static const Parser<std::deque<char>> whitespaces = many(whitespace);
+    static const Parser<char> digit = satisfies([](char ch){return ::isdigit(ch);});
+    static const Parser<char> alpha = satisfies([](char ch){return ::isalpha(ch);});
+    static const Parser<char> alnum = digit | alpha;
+    static const Parser<int>  digit2 = digit.transform([](char ch){ return ch - '0';});
+    static const Parser<std::deque<char>> digits = many(digit);
+
+    template <typename A>
+    Parser<A> lexeme(Parser<A> const &parser_a)
+    {
+        return parser_a >> skip(whitespaces);
+    }
+
+    static const Parser<std::deque<char>> integer_str = lexeme(digits);
+    // static const Parser<std::deque<std::deque<char>>> args = (digits >> many(skip(ischar(',')) >> digits)).transform(&combineTupleToDeq<char>);
+    // static const Parser<std::tuple<std::deque<char>, std::deque<std::deque<char>>>> args = digits >> many(skip(ischar(',')) >> digits);
+    // static const Parser<std::deque<std::deque<char>>> args = digits >> (many(ischar(',') >> digits).transform([](std::tuple<char, std::deque<char>> foo)
+    // {
+    //     std::deque<char> deq = std::get<1>(foo);
+    //     deq.push_frond(std::get<0>(foo));
+    //     return deq;
+    // });
+
 }
 
 Combi::Parser<std::tuple<char, char, char>> myParser()
@@ -362,7 +419,8 @@ int main()
     // auto digit_parser = digit >> alpha >> alpha;
     // auto digit_parser = myParser();
     // auto digit_parser = (digit | alpha) >> digit2 >> digit2;//(digit() >> digit()) >> (digit() >> digit());
-    auto digit_parser = many(digit);
+    // auto digit_parser = many(digit);
+    auto digit_parser = integer_str;
     // auto digit_parser = digit >> digit >> digit >> digit >> digit;
     std::cout << "TEST\n";
     auto parse_results = digit_parser.run(input);
