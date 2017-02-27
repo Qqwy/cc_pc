@@ -87,7 +87,8 @@ namespace Combi
             d_success(true),
             d_content(content),
             d_unparsed_rest(rest)
-        {};
+        {
+        };
 
         inline std::string unparsed_rest() const
         {
@@ -122,11 +123,20 @@ namespace Combi
         Parser(ParseFunction fun)
         :
             d_fun(fun)
-        {};
+        {
+            std::cout << "Parser " << this << " was created!\n";
+        };
         ParseResults<Result> run(std::string const &in) const
         {
             return d_fun(in);
         }
+
+        ~Parser()
+        {
+            std::cout << "Parser " << this << " is getting destroyed!\n";
+        }
+
+
 
         // Simple combinators:
 
@@ -134,10 +144,10 @@ namespace Combi
         auto operator>>(Parser<OtherResult> const &parser_b) const -> decltype(auto)
         {
             typedef decltype(concatenateToTuple(std::declval<Result>(), std::declval<OtherResult>())) result_t;
-            std::cout << "Running operator>> \n";
+            std::cout << this << " Running operator>> \n";
             auto lambda = [=](std::string const &in)
             {
-                std::cout << "Running operator>> lambda \n";
+                std::cout << this << " Running operator>> lambda \n";
                 ParseResults<result_t> results;
                 std::vector<ParseResult<Result>> a_results = this->run(in);
                 for(ParseResult<Result> result_a : a_results)
@@ -155,10 +165,10 @@ namespace Combi
         Parser<Result> operator|(Parser<Result> const &parser_b) const
         {
 
-            std::cout << "Running operator| \n";
+            std::cout << this << " Running operator| \n";
             auto lambda = [=](std::string const &in)
             {
-                std::cout << "Running operator| lambda \n";
+                std::cout << this << " Running operator| lambda \n";
                 ParseResults<Result> a_results = this->run(in);
                 ParseResults<Result> b_results = parser_b.run(in);
                 ParseResults<Result> results = a_results;
@@ -173,7 +183,7 @@ namespace Combi
         template<typename Function>
         auto transform(Function fun) const -> Parser<decltype(fun(std::declval<Result>()))>
         {
-            std::cout << "Running transform \n";
+            std::cout << this << " Running transform \n";
             auto lambda = [&](std::string const &in)
             {
                 std::cout << "Running transform lambda\n";
@@ -247,7 +257,7 @@ namespace Combi
     Parser<TAnything> unit(TAnything const &value)
     {
         std::cout << "Running unit \n";
-        auto lambda = [=](std::string const &in){
+        auto lambda = [&](std::string const &in){
             std::cout << "Running unit lambda \n";
             return ParseResults<TAnything>{ParseResult<TAnything>{value, in}};
         };
