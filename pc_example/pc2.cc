@@ -203,12 +203,12 @@ namespace Combi
         }
 
         template<typename Function>
-        auto transform(Function fun) const -> Parser<decltype(fun(std::declval<Result>()))>
+        auto transform(Function fun) const // -> Parser<decltype(fun(std::declval<Result>()))>
         {
             auto parser_a = *this;
             auto lambda = [parser_a, fun](std::string const &in)
             {
-                ParseResults<Result> a_results = parser_a.d_fun(in);
+                ParseResults<Result> a_results = parser_a.run(in);
                 ParseResults<decltype(fun(std::declval<Result>()))> results;
                 for(ParseResult<Result> result_a : a_results)
                 {

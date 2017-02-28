@@ -1,0 +1,143 @@
+* Why parsers?
+** Regular Expression Engine
+*** limited scope.
+*** Example: Email address
+    RFC 5322.
+    \A(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*
+ |  "(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]
+      |  \\[\x01-\x09\x0b\x0c\x0e-\x7f])*")
+@ (?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?
+  |  \[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}
+       (?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:
+          (?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]
+          |  \\[\x01-\x09\x0b\x0c\x0e-\x7f])+)
+     \])\z
+*** Using Regular Expressions: Now you have two problems.
+*** 'Mini parser'
+** Because they are useful:
+*** Compiling/Interpreting
+*** Doing semantical analysis (linting)
+*** Understanding user input.
+** Because they are fun!
+* What exactly _is_ a parser?
+** A set is a collection of distinct objects. 
+*** Example: {0, 1, 'a', 42}, {1,2,3,...infinity}
+** A bag is a collection of objects, that may include duplicates. 
+*** Example: {2,3,2,5}
+** A string is an ordered bag. 
+*** Example: ['h', 'e', 'l', 'l', 'o', ' ', 'w', 'o', 'r', 'l', 'd']
+** A formal language is a set of strings (of a given alphabet) that follow a given grammar.
+*** Alphabet: Digits, A-Z. ASCII, etc.
+*** Example: Language of simple calculator arithmetic.
+*** Example: English.
+** A grammar is a set of rules that state what, _syntactically_, a string in a given language represents.
+** And if the string is part of that language or not.
+
+** Parsing is recognizing a string, following the rules of a language's grammar.
+*** Understands the _syntax_ of the language.
+*** Does not deal with the _semantics_.
+**** Semantical analysis can be done once a Parse Tree was built.
+*** Example: "Colorless green ideas sleep furiously"
+
+* How to build a Parser?
+** Parser: input -> *magic* -> Parse Tree.
+
+** Two possibilities:
+*** Top Down.
+*** Bottom Up.
+
+EXAMPLE:
+
+grammar:
+  expression := expression '+' expression | number <- NOTE: Left recursion!
+  number := 1-9 digits
+  digits := digit | digit digits
+  digit  := 0-9
+  (start rule: expression)
+input: "42+10+2"
+
+top down:
+- Parse expression
+- Parse number
+- Parse 1-9: 4
+- Parse digits
+- Parse digit: 2
+- Parsing next digit fails, so the first result of 'digits' returns.
+- We've found an int! `int 42`
+- We've found an expression! `expr (int 42)`
+- Parse '+'
+- Parse expression
+- ...
+- We've found an int! `int 10`
+- We've found an expression! `expr (int 10)`
+- We have an expression! `expr (expr (int 42)) + (expr (int 10))`
+- parse '+'
+- parse expression
+- ...
+- We've found an int! `int 2`
+- We've found an expression! `expression (int 2)`
+- We have an expression! `expr (expr ((expr (int 42)) + (expr (int 10)))) + (expr (int 2))`
+- Return this result.
+
+
+Bottom up:
+- next char digit? yes! Put '4' on stack.
+- next char digit? yes! Put '2' on stack.
+- Reduce '4' and '2' to 'int 42'
+- next char digit? no!
+- next char '+'? yes! Put `+` on stack.
+- next char digit? yes! Put '1' on stack
+- next char digit? yes! Put '0' on stack.
+- next char digit? no!
+- reduce '1' and '0' to 'int 10'
+- reduce 'int 42' `+` 'int 10' to 'expr (int 42) (int 10)'
+- next char '+'? yes! Put `+` on stack.
+- ...
+- reduce 'expr (int 42) (int 10)', '+', 'int 2' to 'expr (expr (int 42) (int 10)) (int 2)'
+
+** Problems with Top Down:
+*** Left recursion.
+*** Backtracking takes more time (or, when memoizing, more memory).
+** Solution: use Bottom Up parsing.
+** Problem with Bottom Up:
+*** Because of 'turning inside out' of grammar -> finite state automaton, impossible to write manually.
+** Solution: Create 'Parser Generators'
+*** Drawbacks: 
+**** Generation and compilation separated.
+**** Maintaining/debugging very difficult.
+**** (name later) Still cannot deal with context-sensitive languages: reduce/reduce, shift/reduce conflicts.
+
+* 40 years of research since the Dragon Book
+** Our focus has changed:
+*** Computers are _fast_
+*** Computers have A LOT of memory.
+*** Most expensive: Developer hours.
+** New parsing methods:
+*** Generalized bottom-up (GLR) Elkhound/Elsa
+*** Generalized top-down. (GLL)
+*** Enter functional programming: Parser Combinator Libraries. (ex: Boost::Spirit)
+
+* Writing a Generalized Parser Combinator in C++
+** Parser: input -> *magic* -> (Match, "rest of unmatched string")
+*** But how to handle failure? Solution:
+*** Parser: input -> *magic* -> [(Match, "rest of unmatched string")]
+** Code example of ParseResults and Parser class.
+** Simplest Parser
+*** 'unit'.
+** Second-simplest parser
+*** 'satisfies'
+** Examples of what we can now build.
+** Combining
+*** A | B
+*** A >> B
+*** A.transform(fun)
+** Examples of what we can now build.
+*** many(A)
+*** many1(A)
+*** integer_str
+*** float
+** Possible Improvements
+*** Memoization
+*** Lazy evaluation
+*** Error reporting
+** Congradulations!
