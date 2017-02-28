@@ -220,6 +220,27 @@ namespace Combi
         };
     };
 
+
+    template <typename TResultA, typename TResultB>
+    auto operator>>(std::function<Parser<TResultA>()> const &parser_a, Parser<TResultB> const &parser_b)
+    {
+        return parser_a() >> parser_b;
+    }
+    
+    template <typename TResultA, typename TResultB>
+    auto operator>>(Parser<TResultA> const &parser_a, std::function<Parser<TResultB>()> const &parser_b)
+    {
+        return parser_a >> parser_b();
+    }
+    
+    template <typename TResultA, typename TResultB>
+    auto operator>>(std::function<Parser<TResultA>()> const &parser_a, std::function<Parser<TResultB>()> const &parser_b)
+    {
+        return parser_a() >> parser_b();
+    }
+
+
+
     // Helper functions we do not want to export
     namespace {
 
