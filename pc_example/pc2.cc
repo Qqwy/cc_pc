@@ -199,10 +199,6 @@ namespace Combi
     using ParseResults = std::vector<ParseResult<Result>>;
 
 
-
-
-
-
     template <typename Result>
     class Parser
     {
@@ -218,7 +214,6 @@ namespace Combi
         {
             return d_fun(in);
         }
-
 
 
         // Simple combinators:
@@ -276,13 +271,28 @@ namespace Combi
         };
 
         template <bool IsTuple = is_specialization_of<Result, std::tuple>::value>
-        auto tup2deq() const
+        auto concatDeque() const
         {
             auto lambda = [](Result content){
                 return combineDequeTuple(content);
             };
             return this->transform(lambda);
         };
+
+        template <bool IsTuple = is_specialization_of<Result, std::tuple>::value>
+        auto tup2deq() const
+            {
+                auto lambda = [](Result content){
+                    return combineTupleToDeque(content);
+                };
+                return this->transform(lambda);
+            };
+
+        Parser<std::deque<Result>> singletonDeque() const
+            {
+                return this->transform(&::singletonDeque<Result>);
+            };
+
     };
 
 
@@ -401,7 +411,7 @@ namespace Combi
         {
             return many(parser_a).run(in);
         };
-        Parser<std::deque<TResult>> one_or_more = (parser_a >> Parser<std::deque<TResult>>{lambda}).transform(&combineTupleToDeque<TResult>);
+        Parser<std::deque<TResult>> one_or_more = (parser_a >> Parser<std::deque<TResult>>{lambda}).tup2deq();
         return one_or_more | nothing<TResult>();
     }
 
@@ -446,35 +456,30 @@ namespace Combi
     //     Parser<std::deque<char>> float_exponent = ((ch('e') | ch('E')).transform(singletonDeque<char>) >> maybe(ch('+') | ch('-')) >> digits).transform(float_exponent_transformation);
     // }
     namespace {
-        Parser<std::deque<char>> float_exponent = ((ch('e') | ch('E')).transform(singletonDeque<char>) >> maybe(ch('+') | ch('-')) >> digits).transform([](auto tuple){return combineDequeTuple(tuple);});
+        Parser<std::deque<char>> float_exponent = ((ch('e') | ch('E')).singletonDeque() >> maybe(ch('+') | ch('-')) >> digits).concatDeque();
     }
     static const Parser<std::deque<char>> float_str =
-        (integer_str >> ch('.').transform(singletonDeque<char>) >> digits >> maybe(float_exponent)).transform([](auto tuple){return combineDequeTuple(tuple);});
+                                        (integer_str >> ch('.').transform(singletonDeque<char>) >> digits >> maybe(float_exponent)).concatDeque();
 
     Parser<std::deque<char>> integer_str2()
     {
-        auto trans = [](std::tuple<std::deque<char>, std::deque<char>> const &tuple)
-        {
-            return combineDequeTuple(tuple);
-        };
-
-        return (maybe(ch('-')) >> digits).transform(trans);
+        return (maybe(ch('-')) >> digits).concatDeque();
     }
 
 
     Parser<std::deque<char>> float_str2()
     {
         Parser<std::deque<char>> float_exponent = (
-               (ch('e') | ch('E')).transform(&singletonDeque<char>)
+            (ch('e') | ch('E')).singletonDeque()
                >> maybe(ch('+') | ch('-'))
                >> digits
-            ).transform([](auto tuple){return combineDequeTuple(tuple);});
+            ).concatDeque();
         return (
             integer_str2
-            >> ch('.').transform(&singletonDeque<char>)
+            >> ch('.').singletonDeque()
             >> digits
             >> maybe(float_exponent)
-        ).tup2deq();
+        ).concatDeque();
     }
 
     // static const Parser<std::deque<char>> float_str = (integer_str >> ch('.') >> digits).transform(&combineTuple<char>);
@@ -487,8 +492,6 @@ Combi::Parser<std::tuple<char, char, char>> myParser()
     using namespace Combi;
     return digit >> alpha >> alpha;
 }
-
-
 
 int main()
 {
