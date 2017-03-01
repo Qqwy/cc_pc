@@ -281,17 +281,17 @@ namespace Combi
 
         template <bool IsTuple = is_specialization_of<Result, std::tuple>::value>
         auto concat2deq() const
-            {
-                auto lambda = [](Result content){
-                    return combineTupleToDeque(content);
-                };
-                return this->transform(lambda);
+        {
+            auto lambda = [](Result content){
+                return combineTupleToDeque(content);
             };
+            return this->transform(lambda);
+        };
 
         Parser<std::deque<Result>> singletonDeque() const
-            {
-                return this->transform(&::singletonDeque<Result>);
-            };
+        {
+            return this->transform(&::singletonDeque<Result>);
+        };
 
     };
 
@@ -496,9 +496,9 @@ int main()
     {
         for(auto parse_result : parse_results)
         {
-        std::cout << "Parse success!\n";
-        std::cout << parse_result.content() << '\n';
-        std::cout << "Rest of string: " << parse_result.unparsed_rest();
+            std::cout << "Parse success!\n";
+            std::cout << parse_result.content() << '\n';
+            std::cout << "Rest of string: " << parse_result.unparsed_rest();
         }
     }
     else
