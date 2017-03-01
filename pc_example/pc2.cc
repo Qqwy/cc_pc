@@ -7,8 +7,71 @@
 #include <experimental/optional>
 #include <type_traits>
 
+
+    namespace {
+
+        template <typename TResult>
+        std::deque<TResult> combineTupleToDeque(std::tuple<TResult, std::deque<TResult>> tuple)
+        {
+            std::deque<TResult> vec = std::get<1>(tuple);
+            vec.push_front(std::get<0>(tuple));
+            return vec;
+        }
+
+        template<typename T>
+        std::deque<T> flatten(const std::deque<std::deque<T>> &orig)
+        {
+            std::deque<T> ret;
+            for(const auto &v: orig)
+                ret.insert(ret.end(), v.begin(), v.end());
+            return ret;
+        }
+
+        template<typename first_type, typename tuple_type, size_t ...index>
+        auto tupleToDequeImpl(tuple_type const &tuple, std::index_sequence<index...>)
+        {
+            return std::deque<first_type>{
+                std::get<index>(tuple)...
+                    };
+        }
+
+        template<typename first_type, typename ...others>
+        auto tupleToDeque(std::tuple<first_type, others...> const &tuple)
+        {
+            typedef typename std::remove_reference<decltype(tuple)>::type tuple_type;
+
+            constexpr auto size =
+                std::tuple_size<tuple_type>::value;
+
+            return tupleToDequeImpl<first_type, tuple_type>
+                (tuple, std::make_index_sequence<size>{});
+        }
+
+        template <typename A, typename ...As>
+        auto combineDequeTuple(std::tuple<std::deque<A>, As...> const &tuple)
+        {
+            std::deque<std::deque<A>> nested_deque = tupleToDeque(tuple);
+            return flatten(nested_deque);
+        }
+
+        template <typename A>
+        std::deque<A> singletonDeque(A const &elem)
+        {
+            return std::deque<A>{elem};
+        }
+    }
+
+
+
 namespace Combi
 {
+    //! Tests if T is a specialization of Template
+    template <typename T, template <typename...> class Template>
+    struct is_specialization_of : std::false_type {};
+    template <template <typename...> class Template, typename... Args>
+    struct is_specialization_of<Template<Args...>, Template> : std::true_type {};
+
+
     // Pretty printing for tuples.
     template<size_t N>
     struct print_tuple{
@@ -110,16 +173,13 @@ namespace Combi
     template <typename Content>
     class ParseResult
     {
-        bool d_success = false;
         Content d_content;
         std::string d_unparsed_rest;
 
     public:
 
-        ParseResult(){};
         ParseResult(Content const &content, std::string const &rest)
         :
-            d_success(true),
             d_content(content),
             d_unparsed_rest(rest)
         {
@@ -127,25 +187,21 @@ namespace Combi
 
         inline std::string unparsed_rest() const
         {
-            if(!d_success)
-                throw "Error: Unsuccsessfull parse.!";
             return d_unparsed_rest;
         }
 
         inline Content content() const &
         {
-            if(!d_success)
-                throw "Error: Unsuccsessfull parse.!";
             return d_content;
-        }
-
-        operator bool()
-        {
-            return d_success;
         }
     };
     template <typename Result>
     using ParseResults = std::vector<ParseResult<Result>>;
+
+
+
+
+
 
     template <typename Result>
     class Parser
@@ -218,6 +274,15 @@ namespace Combi
             };
             return Parser<decltype(fun(std::declval<Result>()))>{lambda};
         };
+
+        template <bool IsTuple = is_specialization_of<Result, std::tuple>::value>
+        auto tup2deq() const
+        {
+            auto lambda = [](Result content){
+                return combineDequeTuple(content);
+            };
+            return this->transform(lambda);
+        };
     };
 
 
@@ -242,109 +307,6 @@ namespace Combi
 
 
     // Helper functions we do not want to export
-    namespace {
-
-        // template<typename Function, typename Tuple, size_t ... I>
-//         auto call(Function f, Tuple t, std::index_sequence<I ...>)
-//         {
-//             return f(std::get<I>(t) ...);
-//         }
-
-//         template<typename Function, typename Tuple>
-//         auto call(Function f, Tuple t)
-//         {
-//             static constexpr auto size = std::tuple_size<Tuple>::value;
-//             return call(f, t, std::make_index_sequence<size>{});
-// }
-
-        template <typename TResult>
-        std::deque<TResult> combineTupleToDeque(std::tuple<TResult, std::deque<TResult>> tuple)
-        {
-            std::deque<TResult> vec = std::get<1>(tuple);
-            vec.push_front(std::get<0>(tuple));
-            return vec;
-        }
-
-        // template <typename A>
-        // std::deque<A> combineDeques(std::tuple<std::deque<A>, std::deque<A>> tuple)
-        // {
-        //     std::deque<A> deque_a = std::get<0>(tuple);
-        //     std::deque<A> deque_b = std::get<1>(tuple);
-        //     std::copy(deque_b.begin(), deque_b.end(), std::back_inserter(deque_a));
-        //     return deque_a;
-        // }
-
-        // template <typename A, typename ...As, size_t tuple_size = sizeof...(As)>
-        // std::deque<A> combineTuple(std::tuple<A, As...> tuple)
-        // {
-        //     std::deque<A> deque_a;
-        //     deque_a.push_back(tuple.get<tuple_size - 1>(tuple));
-        // }
-
-        // template <typename A>
-        // std::deque<A> combineTupleImpl()
-        // {
-        //     return std::deque<A>();
-        // }
-        // template <typename A, typename ...As>
-        // std::deque<A> combineTupleImpl(A elem, As... elems)
-        // {
-        //     std::deque<A> deque = combineTupleImpl(elems...);
-        //     // deque.insert(deque.begin(), elem.begin(), elem.end());
-        //     deque.push_front(elem);
-        //     return deque;
-        // }
-
-        // // Exists since c++17
-        // template <typename A, typename ...As>
-        // std::deque<A> combineTuple(std::tuple<A, As...> tuple)
-        // {
-        //     return call(&combineTupleImpl, tuple);
-        // }
-
-        template<typename T>
-        std::deque<T> flatten(const std::deque<std::deque<T>> &orig)
-        {   
-            std::deque<T> ret;
-            for(const auto &v: orig)
-                ret.insert(ret.end(), v.begin(), v.end());
-            return ret;
-        }
-
-        template<typename first_type, typename tuple_type, size_t ...index>
-        auto tupleToDequeImpl(const tuple_type &t, std::index_sequence<index...>)
-        {
-            return std::deque<first_type>{
-                std::get<index>(t)...
-                    };
-        }
-
-        template<typename first_type, typename ...others>
-        auto tupleToDeque(const std::tuple<first_type, others...> &t)
-        {
-            typedef typename std::remove_reference<decltype(t)>::type tuple_type;
-
-            constexpr auto s =
-                std::tuple_size<tuple_type>::value;
-
-            return tupleToDequeImpl<first_type, tuple_type>
-                (t, std::make_index_sequence<s>{});
-        }
-
-        template <typename A, typename ...As>
-        auto combineDequeTuple(const std::tuple<std::deque<A>, As...> &tuple)
-        {
-            std::deque<std::deque<A>> nested_deque = tupleToDeque(tuple);
-            return flatten(nested_deque);
-        }
-
-        template <typename A>
-        std::deque<A> singletonDeque(A const & elem)
-        {
-            return std::deque<A>{elem};
-        }
-    }
-
     // Simple parsers
 
     // Returns matched character if given predicate function returns true.
@@ -502,12 +464,17 @@ namespace Combi
 
     Parser<std::deque<char>> float_str2()
     {
-        // auto exponent_trans = [](std::tuple<std::deque<char>, std::deque<char>, std::deque<char>> const & tuple)
-        //     {
-        //         return combineDequeTuple(tuple);
-        //     };
-        Parser<std::deque<char>> float_exponent = ((ch('e') | ch('E')).transform(singletonDeque<char>) >> maybe(ch('+') | ch('-')) >> digits).transform([](auto tuple){return combineDequeTuple(tuple);});
-        return (integer_str2 >> ch('.').transform(singletonDeque<char>) >> digits >> maybe(float_exponent)).transform([](auto tuple){return combineDequeTuple(tuple);});
+        Parser<std::deque<char>> float_exponent = (
+               (ch('e') | ch('E')).transform(&singletonDeque<char>)
+               >> maybe(ch('+') | ch('-'))
+               >> digits
+            ).transform([](auto tuple){return combineDequeTuple(tuple);});
+        return (
+            integer_str2
+            >> ch('.').transform(&singletonDeque<char>)
+            >> digits
+            >> maybe(float_exponent)
+        ).tup2deq();
     }
 
     // static const Parser<std::deque<char>> float_str = (integer_str >> ch('.') >> digits).transform(&combineTuple<char>);
