@@ -8,58 +8,58 @@
 #include <type_traits>
 
 
-    namespace {
+namespace {
 
-        template <typename TResult>
-        std::deque<TResult> combineTupleToDeque(std::tuple<TResult, std::deque<TResult>> tuple)
-        {
-            std::deque<TResult> vec = std::get<1>(tuple);
-            vec.push_front(std::get<0>(tuple));
-            return vec;
-        }
-
-        template<typename T>
-        std::deque<T> flatten(const std::deque<std::deque<T>> &orig)
-        {
-            std::deque<T> ret;
-            for(const auto &v: orig)
-                ret.insert(ret.end(), v.begin(), v.end());
-            return ret;
-        }
-
-        template<typename first_type, typename tuple_type, size_t ...index>
-        auto tupleToDequeImpl(tuple_type const &tuple, std::index_sequence<index...>)
-        {
-            return std::deque<first_type>{
-                std::get<index>(tuple)...
-                    };
-        }
-
-        template<typename first_type, typename ...others>
-        auto tupleToDeque(std::tuple<first_type, others...> const &tuple)
-        {
-            typedef typename std::remove_reference<decltype(tuple)>::type tuple_type;
-
-            constexpr auto size =
-                std::tuple_size<tuple_type>::value;
-
-            return tupleToDequeImpl<first_type, tuple_type>
-                (tuple, std::make_index_sequence<size>{});
-        }
-
-        template <typename A, typename ...As>
-        auto combineDequeTuple(std::tuple<std::deque<A>, As...> const &tuple)
-        {
-            std::deque<std::deque<A>> nested_deque = tupleToDeque(tuple);
-            return flatten(nested_deque);
-        }
-
-        template <typename A>
-        std::deque<A> singletonDeque(A const &elem)
-        {
-            return std::deque<A>{elem};
-        }
+    template <typename TResult>
+    std::deque<TResult> combineTupleToDeque(std::tuple<TResult, std::deque<TResult>> tuple)
+    {
+        std::deque<TResult> vec = std::get<1>(tuple);
+        vec.push_front(std::get<0>(tuple));
+        return vec;
     }
+
+    template<typename T>
+    std::deque<T> flatten(const std::deque<std::deque<T>> &orig)
+    {
+        std::deque<T> ret;
+        for(const auto &v: orig)
+            ret.insert(ret.end(), v.begin(), v.end());
+        return ret;
+    }
+
+    template<typename first_type, typename tuple_type, size_t ...index>
+    auto tupleToDequeImpl(tuple_type const &tuple, std::index_sequence<index...>)
+    {
+        return std::deque<first_type>{
+            std::get<index>(tuple)...
+                };
+    }
+
+    template<typename first_type, typename ...others>
+    auto tupleToDeque(std::tuple<first_type, others...> const &tuple)
+    {
+        typedef typename std::remove_reference<decltype(tuple)>::type tuple_type;
+
+        constexpr auto size =
+            std::tuple_size<tuple_type>::value;
+
+        return tupleToDequeImpl<first_type, tuple_type>
+            (tuple, std::make_index_sequence<size>{});
+    }
+
+    template <typename A, typename ...As>
+    auto concatDequeTuple(std::tuple<std::deque<A>, As...> const &tuple)
+    {
+        std::deque<std::deque<A>> nested_deque = tupleToDeque(tuple);
+        return flatten(nested_deque);
+    }
+
+    template <typename A>
+    std::deque<A> singletonDeque(A const &elem)
+    {
+        return std::deque<A>{elem};
+    }
+}
 
 
 
@@ -271,16 +271,16 @@ namespace Combi
         };
 
         template <bool IsTuple = is_specialization_of<Result, std::tuple>::value>
-        auto concatDeque() const
+        auto tup2deq() const
         {
             auto lambda = [](Result content){
-                return combineDequeTuple(content);
+                return concatDequeTuple(content);
             };
             return this->transform(lambda);
         };
 
         template <bool IsTuple = is_specialization_of<Result, std::tuple>::value>
-        auto tup2deq() const
+        auto concat2deq() const
             {
                 auto lambda = [](Result content){
                     return combineTupleToDeque(content);
@@ -308,11 +308,6 @@ namespace Combi
         return parser_a >> parser_b();
     }
     
-    // template <typename TResultA, typename TResultB>
-    // auto operator>>(Parser<TResultA> const (*parser_a)(), Parser<TResultB> const (*parser_b)())
-    // {
-    //     return parser_a() >> parser_b();
-    // }
 
 
 
@@ -340,6 +335,11 @@ namespace Combi
     Parser<char> ch(char the_char)
     {
         return satisfies([the_char](char real_char){return the_char == real_char;});
+    }
+
+    Parser<std::deque<char>> chd(char the_char)
+    {
+        return ch(the_char).singletonDeque();
     }
 
     // Matches if input starts with given string.
@@ -411,7 +411,7 @@ namespace Combi
         {
             return many(parser_a).run(in);
         };
-        Parser<std::deque<TResult>> one_or_more = (parser_a >> Parser<std::deque<TResult>>{lambda}).tup2deq();
+        Parser<std::deque<TResult>> one_or_more = (parser_a >> Parser<std::deque<TResult>>{lambda}).concat2deq();
         return one_or_more | nothing<TResult>();
     }
 
@@ -436,55 +436,32 @@ namespace Combi
         return parser_a >> skip(whitespaces);
     }
 
-    // namespace {
-    //     auto integer_str_transformation = [](std::tuple<std::deque<char>, std::deque<char>> const &tuple)
-    //     {
-    //         return combineDequeTuple(tuple);
-    //     };
-    // }
-    static const Parser<std::deque<char>> integer_str = (maybe(ch('-')) >> digits).transform([](auto tuple){return combineDequeTuple(tuple);});
-    // namespace {
-    //     auto float_str_transformation = [](std::tuple<std::deque<char>, std::deque<char>, std::deque<char>, std::deque<char>> const &tuple)
-    //     {
-    //         return combineDequeTuple(tuple);
-    //     };
+    static const Parser<std::deque<char>> integer_str = (maybe(ch('-')) >> digits).tup2deq();
 
-    //     auto float_exponent_transformation = [](std::tuple<std::deque<char>, std::deque<char>, std::deque<char>> const & tuple)
-    //     {
-    //         return combineDequeTuple(tuple);
-    //     };
-    //     Parser<std::deque<char>> float_exponent = ((ch('e') | ch('E')).transform(singletonDeque<char>) >> maybe(ch('+') | ch('-')) >> digits).transform(float_exponent_transformation);
-    // }
     namespace {
-        Parser<std::deque<char>> float_exponent = ((ch('e') | ch('E')).singletonDeque() >> maybe(ch('+') | ch('-')) >> digits).concatDeque();
+        Parser<std::deque<char>> float_exponent = ((ch('e') | ch('E')).singletonDeque() >> maybe(ch('+') | ch('-')) >> digits).tup2deq();
     }
     static const Parser<std::deque<char>> float_str =
-                                        (integer_str >> ch('.').transform(singletonDeque<char>) >> digits >> maybe(float_exponent)).concatDeque();
+                                        (integer_str >> ch('.').singletonDeque() >> digits >> maybe(float_exponent)).tup2deq();
 
     Parser<std::deque<char>> integer_str2()
     {
-        return (maybe(ch('-')) >> digits).concatDeque();
+        return (maybe(ch('-')) >> digits).tup2deq();
     }
 
 
     Parser<std::deque<char>> float_str2()
     {
+        auto plus_or_min = chd('+') | chd('-');
         Parser<std::deque<char>> float_exponent = (
-            (ch('e') | ch('E')).singletonDeque()
-               >> maybe(ch('+') | ch('-'))
-               >> digits
-            ).concatDeque();
+            (chd('e') | chd('E')) >> maybe(plus_or_min) >> digits).tup2deq();
         return (
             integer_str2
-            >> ch('.').singletonDeque()
+            >> chd('.')
             >> digits
             >> maybe(float_exponent)
-        ).concatDeque();
+        ).tup2deq();
     }
-
-    // static const Parser<std::deque<char>> float_str = (integer_str >> ch('.') >> digits).transform(&combineTuple<char>);
-
-    // static const Parser<std::deque<char>>
 }
 
 Combi::Parser<std::tuple<char, char, char>> myParser()
