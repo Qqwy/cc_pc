@@ -311,7 +311,6 @@ namespace Combi
 
 
 
-    // Helper functions we do not want to export
     // Simple parsers
 
     // Returns matched character if given predicate function returns true.
